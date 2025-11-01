@@ -1,4 +1,12 @@
+## 📚 Documentation for Making Scribit Work Locally
 
+**🔍 New to this firmware?** Start here:
+- **[FIRMWARE_ANALYSIS.md](FIRMWARE_ANALYSIS.md)** - Complete analysis of what's included, what works, and what's missing
+- **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** - Multi-phase plan to enable local g-code operation without cloud services
+
+**Summary**: The firmware is complete and functional. It was designed for cloud operation but can be modified to work locally. See the analysis document for full details.
+
+---
 
 ## Original firmware behavior
 
@@ -86,6 +94,7 @@ To reset the Wi-Fi configuration, press the button for at least 2 seconds. The d
   - `python ~/Library/Arduino15/packages/briki/hardware/mbc-wb/2.0.0/tools/espota.py -i 192.168.240.1 -p 3232 -f docker/builds/ScribitESP.ino.bin`
   - `python ~/Library/Arduino15/packages/briki/hardware/mbc-wb/2.0.0/tools/espota.py -i 192.168.240.1 -p 3232 -c -f docker/builds/MK4duo.ino.bin`
   - `python ~/Library/Arduino15/packages/briki/hardware/mbc-wb/2.0.0/tools/espota.py -i 192.168.240.1 -p 3232 -s -f docker/builds/ScribitESP.ino.partitions.bin`
+  - **NOTE: For OTA, use MK4duo.ino.bin (not the with_bootloader version). The bootloader version is only for initial USB flashing.**
 - Follow the document [MBC-W](docs/MBC-WB-UserManual_v-2-1-min-1.pdf)
 
 ## Known Bugs
