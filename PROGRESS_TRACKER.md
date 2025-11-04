@@ -7,7 +7,8 @@ Enable Scribit to execute g-code files locally without dependency on offline clo
 - **Current Phase:** Phase 0 (Validation) - In Progress
 - **Firmware Compilation:** ✅ Both ESP32 and SAMD21 build successfully
 - **Hardware:** ✅ Physical Scribit robot available
-- **Main Blocker:** Boot loop caused by waiting for offline MQTT broker
+- **Boot Status:** ✅ Firmware boots to IDLE state (solid white LED)
+- **Current Blocker:** HTTP server (port 8888) not starting after boot
 
 ---
 
@@ -406,6 +407,47 @@ const unsigned long SI_MQTT_PORT = 1883;       // Non-TLS port
 2. Investigate partition table requirements
 3. Explore USB serial debugging if possible
 4. Consider if SAMD21 firmware needs reflashing
+
+### 2025-11-03 - Session 3 (Boot Loop Fix - BREAKTHROUGH!)
+**Phase 0 Resolution:**
+
+**Major Discovery:**
+- "Boot loop" was actually successful OTA flash → device reboots to new firmware → crashes during boot
+- Factory reset (5+ sec button hold) switches between app0 (factory) and app1 (OTA) partitions
+- Factory firmware works, our flashed firmware was crashing
+
+**Root Cause Found:**
+- `ScribIt.cpp:181-195` - Infinite `while` loop waiting for MQTT status message
+- Without MQTT broker → loop forever → watchdog timeout → crash → recovery mode
+- Additional crash: `SIMQTT.begin()` tries to connect with empty host string
+
+**Fixes Applied:**
+1. **Skip MQTT initialization** when `SI_MQTT_HOST` is empty (line 136)
+2. **Made SAMD sync non-fatal** - continue to BOOT state even if sync fails (line 171-179)
+3. **Added 3-second boot timeout** - force transition to IDLE if no MQTT response (line 191-203)
+
+**Results:**
+- ✅ Firmware compiles successfully
+- ✅ OTA flash succeeds
+- ✅ Device boots to IDLE state (solid white LED - first time!)
+- ✅ WiFi active (ping responds on 192.168.240.1)
+- ❌ HTTP server on port 8888 not starting
+- ❌ MBC-WB network instead of ScribIt-... network
+
+**Current Status:** MAJOR PROGRESS
+- Device no longer crashes during boot
+- Enters IDLE state successfully
+- WiFi layer functional
+- Need to investigate why HTTP server doesn't start
+
+**Files Modified:**
+- `Firmware/ScribitESP/ScribIt.cpp` (boot timeout, MQTT skip, SAMD non-fatal)
+
+**Next Steps:**
+1. Investigate why HTTP server (port 8888) doesn't start
+2. Check WiFi AP configuration - why MBC-WB instead of ScribIt-...
+3. Verify HTTP server initialization code in `ScribIt_wifi.cpp`
+4. Consider enabling SI_DEBUG_BUILD for serial output
 
 ---
 

@@ -132,10 +132,18 @@ void ScribIt::begin()
     if (!m_testMode) //Skip if test mode
     {
         leds.doubleBlink(255, 255, 255, 0.5);
-        //Init MQTT----------------------------
-        SIMQTT.begin(m_ID);
-
-        SIMQTT.debug(TAG, "MQTT Started");
+        //Init MQTT (only if host configured)----------------------------
+        if (strlen(SI_MQTT_HOST) > 0)
+        {
+            SIMQTT.begin(m_ID);
+            SIMQTT.debug(TAG, "MQTT Started");
+        }
+        else
+        {
+#ifdef SI_DEBUG_ESP
+            Serial.println("Local mode: MQTT disabled (no host configured)");
+#endif
+        }
     }
 
     //Init serial manager
@@ -164,8 +172,11 @@ void ScribIt::begin()
         {
             errorCode = SIMQTT_ERROR_CANNOT_SYNC_MK4DUO;
             errorMessage = "Sync with Mk4Duo failed";
-            SIMQTT.error(errorMessage, errorCode);
-            setState(SI_ERROR);
+#ifdef SI_DEBUG_ESP
+            Serial.println("WARNING: SAMD sync failed - continuing in local mode");
+#endif
+            //Don't enter ERROR state - continue anyway for local mode
+            setState(SI_BOOT);
         }
         else if (!m_testMode)
         {
@@ -177,9 +188,19 @@ void ScribIt::begin()
 
     //Wait for go message (Status req)-------------------------------
     uint32_t startTime = millis();
+    const uint32_t BOOT_LOOP_TIMEOUT_MS = 3000; // 3 second timeout for local mode
     //Loop until state req received or always if in error
     while (m_state == SI_BOOT || m_state == SI_ERROR)
     {
+        //Local mode: Force transition to IDLE after timeout (no MQTT broker)
+        if (millis() - startTime > BOOT_LOOP_TIMEOUT_MS)
+        {
+#ifdef SI_DEBUG_ESP
+            Serial.println("Boot loop timeout - entering local mode (IDLE)");
+#endif
+            setState(SI_IDLE);
+            break;
+        }
         //If timeout elapsed send boot message again
         if (m_state == SI_BOOT && millis() - startTime > BOOT_MESSAGE_RESEND_TIMEOUT_MS)
         {
