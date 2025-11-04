@@ -4,11 +4,12 @@
 Enable Scribit to execute g-code files locally without dependency on offline cloud services (MQTT broker, calibration API).
 
 ## 📊 Overall Status
-- **Current Phase:** Phase 0 (Validation) - In Progress
+- **Current Phase:** Phase 0 (Validation) - Nearly Complete
 - **Firmware Compilation:** ✅ Both ESP32 and SAMD21 build successfully
 - **Hardware:** ✅ Physical Scribit robot available
 - **Boot Status:** ✅ Firmware boots to IDLE state (solid white LED)
-- **Current Blocker:** HTTP server (port 8888) not starting after boot
+- **WiFi Status:** ✅ ScribIt-... AP mode active, ping responds
+- **Current Task:** Add HTTP server for local mode control (port 8888)
 
 ---
 
@@ -448,6 +449,46 @@ const unsigned long SI_MQTT_PORT = 1883;       // Non-TLS port
 2. Check WiFi AP configuration - why MBC-WB instead of ScribIt-...
 3. Verify HTTP server initialization code in `ScribIt_wifi.cpp`
 4. Consider enabling SI_DEBUG_BUILD for serial output
+
+### 2025-11-03 - Session 3 Continued (WiFi AP Fix)
+**WiFi Configuration Fix:**
+
+**Investigation Findings:**
+- HTTP server (port 8888) only active during `configureWifi()` - temporary WiFi setup phase
+- Normal operation has no HTTP server at all
+- Original firmware connects to saved WiFi or enters config mode
+- `WiFi.begin()` was being called without credentials, causing undefined behavior
+- Device showed MBC-WB (bootloader) instead of ScribIt-... (firmware AP)
+
+**Root Cause:**
+- Line 119: `WiFi.begin()` called without checking for local mode
+- No AP created for local operation without MQTT
+- HTTP server never started for local control
+
+**Fix Applied:**
+- Added local mode detection: `bool localMode = (strlen(SI_MQTT_HOST) == 0)`
+- Force WiFi AP mode when in local mode (line 120-136)
+- Creates `ScribIt-XXXXXX` AP using device MAC address
+- Sets static IP 192.168.240.1 (ESP32 default for softAP)
+
+**Results:**
+- ✅ ScribIt-... WiFi network now appears!
+- ✅ Ping responds on 192.168.240.1
+- ✅ Firmware stays running (solid white LED)
+- ❌ Port 8888 still closed (expected - HTTP server not added yet)
+
+**Current Status:** BREAKTHROUGH #2
+- Device boots successfully
+- Correct WiFi AP active
+- Ready for HTTP server implementation
+
+**Files Modified:**
+- `Firmware/ScribitESP/ScribIt.cpp` (WiFi AP local mode, lines 118-151)
+
+**Next Steps:**
+1. Add persistent HTTP server for local mode
+2. Implement basic endpoints (status, upload g-code)
+3. Test end-to-end workflow
 
 ---
 

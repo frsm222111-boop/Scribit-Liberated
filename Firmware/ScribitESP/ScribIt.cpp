@@ -116,17 +116,38 @@ void ScribIt::begin()
     }
 
     //Wifi config---------------------------
-    WiFi.begin();
-    if (WiFi.waitForConnectResult() == WL_CONNECTED)
+    //Local mode: If no MQTT host, force AP mode for HTTP control
+    bool localMode = (strlen(SI_MQTT_HOST) == 0);
+
+    if (localMode)
     {
 #ifdef SI_DEBUG_ESP
-        Serial.printf("Connected to wifi \"%s\", RSSI:%d dB IP:", WiFi.SSID().c_str(), WiFi.RSSI());
-        Serial.println(WiFi.localIP());
+        Serial.println("Local mode detected - starting AP mode");
+#endif
+        //Start AP mode for local HTTP control
+        char apSsid[16];
+        sprintf(apSsid, SI_AP_SSID, m_ID[3], m_ID[4], m_ID[5]);
+        WiFi.softAP(apSsid, nullptr);
+#ifdef SI_DEBUG_ESP
+        Serial.printf("AP started: %s\n", apSsid);
+        Serial.print("IP: ");
+        Serial.println(WiFi.softAPIP());
 #endif
     }
     else
     {
-        configureWifi();
+        WiFi.begin();
+        if (WiFi.waitForConnectResult() == WL_CONNECTED)
+        {
+#ifdef SI_DEBUG_ESP
+            Serial.printf("Connected to wifi \"%s\", RSSI:%d dB IP:", WiFi.SSID().c_str(), WiFi.RSSI());
+            Serial.println(WiFi.localIP());
+#endif
+        }
+        else
+        {
+            configureWifi();
+        }
     }
 
     if (!m_testMode) //Skip if test mode
