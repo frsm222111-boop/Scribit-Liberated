@@ -149,13 +149,41 @@ Response:
 
 ## Phase 2: Web Interface 🌐
 
-**Purpose:** Create simple web UI for easy file upload
+**Purpose:** Create simple web UI for easy file upload with erase mode and g-code offset
 
 **Status:** Not Started
 
+### Hardware Capabilities Research (2025-11-04)
+
+**Pen Switching (4-color support):**
+- 4 pen holders mounted on revolving Z-axis cylinder
+- Hall sensor for homing reference point
+- `G77` - Home pen cylinder to position 0
+- Z-axis rotation angles: 0°, 90°, 180°, 270° (pens 0-3)
+- Each pen can have different pressure calibration via `G101`
+- Test file created: `test-pen-switch.gcode`
+
+**Erasing (ceramic heater):**
+- Fixed ceramic heater position
+- Offset: 77mm directly below pen position (Y-axis)
+- Uses standard heater g-code: `M104 S[temp]`
+- Firmware tracks `SI_ERASING` state separately from printing
+- LED shows yellow for erase vs white for print
+- **Implementation:** Web UI will handle coordinate transformation (shift all Y coordinates by -77mm)
+
+**Calibration:**
+- Auto-calibration requires cloud API (not available)
+- Manual calibration method documented in `docs/support-scribit-design/360025212312-How-to-Scribit-manual-calibration.md`
+- Custom commands: `G100` (auto calibrate), `G101` (sensitivity), `M777` (read IMU)
+- **Implementation:** Web UI will provide manual calibration helper
+
 ### Tasks
 - [ ] Create HTML upload form with drag-and-drop
-- [ ] Add JavaScript for file handling
+- [ ] Add erase mode toggle (applies -77mm Y offset to all coordinates)
+- [ ] Add manual calibration helper (input wall dimensions, generate starting position)
+- [ ] Add JavaScript for file handling and coordinate transformation
+- [ ] Add pen homing button (sends G77 command)
+- [ ] Show current device state (IDLE/PRINTING/ERASING)
 - [ ] Implement WebSocket for real-time status
 - [ ] Add print controls (start/pause/stop)
 - [ ] Style with mobile-friendly CSS
@@ -163,25 +191,68 @@ Response:
 - [ ] Test on desktop and mobile browsers
 
 ### Files to Create
-- [ ] `Firmware/ScribitESP/data/index.html`
-- [ ] `Firmware/ScribitESP/data/style.css`
-- [ ] `Firmware/ScribitESP/ScribIt_webserver.cpp`
+- [ ] `Firmware/ScribitESP/data/index.html` - Upload form, erase toggle, calibration helper, status display, controls
+- [ ] `Firmware/ScribitESP/data/app.js` - G-code coordinate transformation, file handling, WebSocket
+- [ ] `Firmware/ScribitESP/data/style.css` - Mobile-friendly styling
+- [ ] `Firmware/ScribitESP/ScribIt_webserver.cpp` - HTTP server for static files, WebSocket
+
+### Web Server Routes
+```
+GET  /                → Serve index.html
+GET  /app.js          → Serve JavaScript app
+GET  /style.css       → Serve CSS
+GET  /status          → JSON status (existing)
+POST /upload          → G-code upload (existing from Phase 1)
+POST /command         → Send single g-code command (e.g., G77 for pen homing)
+POST /control         → Start/pause/stop commands
+GET  /files           → List uploaded files (future)
+WS   /ws              → WebSocket status updates
+```
 
 ### Features
-- Real-time print progress
-- LED color preview
+
+**Core Functionality:**
+- Drag-and-drop g-code upload
+- Real-time status via WebSocket (IDLE/PRINTING/ERASING)
+- Print controls (pause/stop)
 - File size validation
-- Visual feedback
+- Visual feedback during upload
+
+**Erase Mode:**
+- Toggle: "Print Mode" / "Erase Mode"
+- When enabled: automatically shifts all Y coordinates by -77mm
+- Sends g-code with heater commands (M104)
+- Different visual indicator (yellow vs white)
+
+**Pen Management:**
+- "Home Pen Cylinder" button (sends G77)
+- Display current pen position (0-3)
+- Optional: pen selection buttons (rotate Z to 0°/90°/180°/270°)
+
+**Manual Calibration Helper:**
+- Form inputs: wall width, wall height
+- Form inputs: A1/B1 and A2/B2 hole positions
+- Calculate button → generates starting position g-code
+- Prepends calibration commands to uploaded file
+
+**UI/UX:**
 - Mobile responsive design
+- Works on phone/tablet/desktop
+- Clear status indicators
+- Error messages displayed clearly
 
 ### Success Criteria
-- [ ] Web UI loads in browser at `http://192.168.x.x/`
+- [ ] Web UI loads in browser at `http://192.168.240.1/`
 - [ ] Can upload files via drag-and-drop
 - [ ] Real-time status updates work
 - [ ] Mobile-friendly interface
 - [ ] Error messages displayed clearly
+- [ ] Web UI loads in < 2 seconds
+- [ ] Intuitive for non-technical users
 
 **Estimated Time:** 6-10 hours
+
+**Dependencies:** Phase 1 must be complete
 
 ---
 
@@ -191,29 +262,71 @@ Response:
 
 **Status:** Not Started
 
+**Note:** Alternative approach - uses original architecture, no firmware changes needed (just config)
+
 ### Tasks
-- [ ] Install Mosquitto on local network
+- [ ] Install Mosquitto on local network (Docker or native)
 - [ ] Configure `SIConfig.hpp` with local broker IP
 - [ ] Set up local file server for g-code hosting
 - [ ] Test PRINT/ERASE commands via MQTT
 - [ ] Verify status updates work
 
-### Configuration Changes Needed
+### Setup Steps
+
+1. **Install Mosquitto on local server:**
+```bash
+# Docker example
+docker run -d -p 1883:1883 eclipse-mosquitto
+```
+
+2. **Configure SIConfig.hpp:**
 ```cpp
 const char SI_MQTT_HOST[] = "192.168.1.100";  // Local broker IP
 const unsigned long SI_MQTT_PORT = 1883;       // Non-TLS port
 ```
 
+3. **Set up local file server:**
+```bash
+# Simple Python HTTP server
+python3 -m http.server 8080
+```
+
+4. **Send print command:**
+```bash
+mosquitto_pub -h 192.168.1.100 -t "tin/xxxxxx/print" \
+  -m '{"url":"http://192.168.1.100:8080/drawing.gcode"}'
+```
+
+### Workflow
+```
+User → MQTT Publish → Local Broker → Scribit
+                      (192.168.x.x)
+
+User → HTTP Server → Scribit downloads g-code
+       (local NAS)
+```
+
 ### Success Criteria
 - [ ] Scribit connects to local MQTT broker
-- [ ] Can send PRINT commands
+- [ ] Can send PRINT/ERASE commands
 - [ ] Downloads from local HTTP server
 - [ ] Status updates via MQTT topics
 - [ ] Broker uptime > 99.9%
+- [ ] MQTT latency < 500ms on local network
+
+### Pros/Cons
+
+**Pros:**
+- Uses original architecture
+- No firmware changes needed (just config)
+- Supports all existing MQTT features
+
+**Cons:**
+- Requires separate server running 24/7
+- More complex setup
+- Network dependency
 
 **Estimated Time:** 4-6 hours
-
-**Note:** This is an alternative to Phase 1. Choose based on preference.
 
 ---
 
@@ -223,23 +336,52 @@ const unsigned long SI_MQTT_PORT = 1883;       // Non-TLS port
 
 **Status:** Not Started
 
+**Note:** External tools, no firmware changes required
+
 ### Planned Tools
-- [ ] SVG to G-code converter
-  - [ ] Parse SVG paths
-  - [ ] Convert to G0/G1 commands
-  - [ ] Add pen up/down
-- [ ] Image to G-code (stippling/hatching)
-  - [ ] Edge detection
-  - [ ] Path planning
-  - [ ] Grayscale to line density
-- [ ] Text to G-code renderer
-  - [ ] Font rendering
-  - [ ] Stroke path generation
-  - [ ] Line breaking for wall width
-- [ ] Drawing optimization
-  - [ ] Path ordering (reduce travel)
-  - [ ] Pen change minimization
-  - [ ] Preview generator
+
+#### 1. SVG to G-code Converter
+- [ ] Parse SVG paths
+- [ ] Convert to G0/G1 commands
+- [ ] Add pen up/down commands (M18)
+- [ ] Handle multiple paths/layers
+- [ ] Respect wall boundaries (200mm × 150mm typical)
+
+**Example usage:**
+```bash
+python svg2gcode.py drawing.svg -o output.gcode \
+  --wall-width 200 --wall-height 150
+```
+
+#### 2. Image to G-code (Stippling/Hatching)
+- [ ] Edge detection
+- [ ] Path planning algorithms
+- [ ] Grayscale to line density conversion
+- [ ] Multiple styles (stipple, hatch, contour)
+
+**Example usage:**
+```bash
+python image2gcode.py photo.jpg -o stipple.gcode \
+  --style stipple --density 50
+```
+
+#### 3. Text to G-code Renderer
+- [ ] Font rendering (TrueType/OpenType)
+- [ ] Stroke path generation
+- [ ] Line breaking for wall width
+- [ ] Text positioning/alignment
+
+**Example usage:**
+```bash
+python text2gcode.py "Hello World" -o text.gcode \
+  --font Arial --size 50
+```
+
+#### 4. Drawing Optimization
+- [ ] Path ordering (reduce travel time)
+- [ ] Pen change minimization
+- [ ] Preview image generator
+- [ ] Time estimation
 
 ### Success Criteria
 - [ ] Can convert SVG to valid g-code
@@ -247,21 +389,28 @@ const unsigned long SI_MQTT_PORT = 1883;       // Non-TLS port
 - [ ] Optimizes pen travel
 - [ ] Generates preview images
 - [ ] SVG conversion accuracy > 95%
+- [ ] Optimization reduces print time by > 20%
 
-**Estimated Time:** 20-40 hours
+### Dependencies
+- Python 3.x
+- Libraries: svgpathtools, Pillow, matplotlib
+- G-code knowledge
+- Understanding of Scribit coordinate system
+
+**Estimated Time:** 20-40 hours (depends on features)
 
 ---
 
 ## 📚 Documentation
 
 - [x] Firmware analysis: `FIRMWARE_ANALYSIS.md`
-- [x] Implementation plan: `IMPLEMENTATION_PLAN.md`
-- [x] Updated README with documentation links
 - [x] Progress tracker: `PROGRESS_TRACKER.md`
-- [ ] Local upload workflow documentation
-- [ ] Troubleshooting guide
-- [ ] API documentation for HTTP endpoints
-- [ ] G-code format specification
+- [x] User setup guide: `LOCAL_MODE_SETUP.md`
+- [x] Updated README with documentation links
+- [x] Pre-compiled binaries in `releases/`
+- [ ] Troubleshooting guide (advanced)
+- [ ] API documentation for HTTP endpoints (detailed)
+- [ ] G-code format specification for Scribit
 - [ ] Calibration guide (manual method)
 
 ---
@@ -569,6 +718,154 @@ curl -v -X POST http://192.168.240.1:8888/upload \
 - Phase 2: Build web UI for easier uploads
 - Phase 4: Create SVG/image to g-code converters
 - Use current curl-based workflow for now
+
+### 2025-11-04 - Session 5 (Hardware Capabilities Research)
+**Phase 2 Preparation:**
+
+**Research Findings:**
+
+1. **Pen Switching Mechanism:**
+   - Located G77 command: Homes 4-pen revolving cylinder using Hall sensor
+   - Z-axis controls pen rotation (0°/90°/180°/270° = pens 0-3)
+   - Found in: `Firmware/MK4duo/src/core/commands/gcode/scribit/g77.h`
+   - Hall sensor calibrates on first G77 call per session
+   - Each pen can have different pressure calibration (G101 command)
+
+2. **Eraser Hardware:**
+   - Ceramic heater at fixed position
+   - Physical offset: 77mm below pen (Y-axis direction)
+   - Uses standard heating commands (M104 S[temp])
+   - Firmware tracks SI_ERASING state separately
+   - LED indicator: yellow for erase, white for print
+   - No automatic coordinate transformation in firmware
+
+3. **Calibration Options:**
+   - Auto-calibration (G100) requires cloud API - not available
+   - IMU-based pen detection (M777) - works but needs cloud processing
+   - Manual calibration documented in support docs
+   - Decision: Implement manual calibration helper in web UI
+
+**Implementation Decisions:**
+- ✅ Erase mode: Web UI handles Y-offset transformation (-77mm)
+- ✅ Pen switching: Add G77 button, document Z rotation angles
+- ✅ Calibration: Manual helper form in web UI
+- ✅ Keep firmware simple, handle complexity in web UI
+
+**Files Created:**
+- `test-pen-switch.gcode` - Test file for 4-pen switching
+
+**Updated Phase 2 Requirements:**
+- Erase mode toggle with automatic coordinate offset
+- Manual calibration helper (wall dimensions → starting position)
+- Pen homing button (G77 command)
+- WebSocket for real-time status
+- G-code transformation in JavaScript
+
+---
+
+## Phase 5: Advanced Features (Future) 🚀
+
+**Purpose:** Enhanced functionality beyond basic operation
+
+**Status:** Ideas/Planning
+
+### Possible Enhancements
+- [ ] Multi-file management (queue system)
+- [ ] SD card support for large files
+- [ ] G-code preview rendering
+- [ ] Time estimation
+- [ ] Material/pen management
+- [ ] Auto-recovery on power loss
+- [ ] Remote monitoring (local web dashboard)
+- [ ] G-code editor with validation
+- [ ] Drawing library/gallery
+- [ ] Integration with design tools (Inkscape, Illustrator)
+
+---
+
+## 🎯 Recommended Paths
+
+### Minimum Viable Product (MVP) - COMPLETE ✅
+```
+Phase 0 → Phase 1
+```
+**Result:** Can upload and execute g-code files locally
+**Time:** 1-2 days
+
+### Enhanced User Experience
+```
+Phase 0 → Phase 1 → Phase 2
+```
+**Result:** Web-based upload and monitoring
+**Time:** 3-5 days
+
+### Full Local Infrastructure
+```
+Phase 0 → Phase 1 → Phase 2 → Phase 4
+```
+**Result:** Complete standalone system with conversion tools
+**Time:** 2-3 weeks
+
+---
+
+## 🧪 Testing Strategy
+
+### Per-Phase Testing
+Each phase should include:
+1. Unit tests (where applicable)
+2. Integration tests with hardware
+3. Error condition testing
+4. User acceptance testing
+
+### Test Cases to Cover
+- [x] Upload small file (< 100KB)
+- [ ] Upload large file (> 1MB)
+- [ ] Upload while printing (should reject with 409)
+- [ ] Upload invalid g-code
+- [ ] Network interruption during upload
+- [ ] SPIFFS full condition
+- [ ] Pause/resume functionality
+- [ ] Emergency stop
+- [ ] Power cycle recovery
+
+---
+
+## 🔄 Rollback Plan
+
+### Git Workflow
+- Use branches per phase: `git checkout -b phase-N-description`
+- Keep original binaries: `docker/builds/original-backup/`
+- Configuration backups before changes
+- OTA recovery: Always keep working firmware accessible
+
+### Recovery
+- Test new builds on development device first
+- Can reflash original firmware via OTA if needed
+- Factory reset switches between app0/app1 partitions
+
+---
+
+## 📦 Resources
+
+### Hardware
+- ✅ Scribit robot
+- ✅ USB cable for initial flash
+- Optional: Raspberry Pi for MQTT broker (Phase 3)
+
+### Software
+- ✅ Docker (for building)
+- ✅ Git for version control
+- ✅ espota.py (OTA flashing)
+- Optional: MQTT client tools (Phase 3)
+- Optional: Python 3.x (Phase 4)
+
+### Knowledge Required
+- C++ (for firmware modifications)
+- HTTP/REST APIs
+- HTML/CSS/JavaScript (Phase 2)
+- MQTT protocol (Phase 3)
+- G-code format
+- SVG/graphics programming (Phase 4)
 
 ---
 

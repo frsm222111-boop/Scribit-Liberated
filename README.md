@@ -5,8 +5,7 @@
 
 **🔍 Developer documentation:**
 - **[FIRMWARE_ANALYSIS.md](FIRMWARE_ANALYSIS.md)** - Complete analysis of what's included, what works, and what's missing
-- **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** - Multi-phase plan to enable local g-code operation without cloud services
-- **[PROGRESS_TRACKER.md](PROGRESS_TRACKER.md)** - Implementation progress and session notes
+- **[PROGRESS_TRACKER.md](PROGRESS_TRACKER.md)** - Implementation progress, multi-phase plan, and session notes
 
 **Summary**: The firmware is complete and functional. It was designed for cloud operation but can be modified to work locally. See the analysis document for full details.
 
