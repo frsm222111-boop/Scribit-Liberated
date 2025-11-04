@@ -1,8 +1,12 @@
 ## 📚 Documentation for Making Scribit Work Locally
 
-**🔍 New to this firmware?** Start here:
+**🎯 Want to use local mode on your Scribit?** Start here:
+- **[LOCAL_MODE_SETUP.md](LOCAL_MODE_SETUP.md)** - Step-by-step guide for non-technical users
+
+**🔍 Developer documentation:**
 - **[FIRMWARE_ANALYSIS.md](FIRMWARE_ANALYSIS.md)** - Complete analysis of what's included, what works, and what's missing
 - **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** - Multi-phase plan to enable local g-code operation without cloud services
+- **[PROGRESS_TRACKER.md](PROGRESS_TRACKER.md)** - Implementation progress and session notes
 
 **Summary**: The firmware is complete and functional. It was designed for cloud operation but can be modified to work locally. See the analysis document for full details.
 
