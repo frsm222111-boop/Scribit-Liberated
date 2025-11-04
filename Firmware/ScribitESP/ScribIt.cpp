@@ -133,6 +133,12 @@ void ScribIt::begin()
         Serial.print("IP: ");
         Serial.println(WiFi.softAPIP());
 #endif
+        //Start HTTP server for local mode control
+        m_localServer = new WiFiServer(8888);
+        m_localServer->begin();
+#ifdef SI_DEBUG_ESP
+        Serial.println("HTTP server started on port 8888");
+#endif
     }
     else
     {
@@ -268,6 +274,12 @@ void ScribIt::loop()
 
     if (!m_testMode)
     {
+        //Handle HTTP requests in local mode
+        if (m_localServer != nullptr)
+        {
+            handleHTTPRequests();
+        }
+
         //Process MQTT
         SIMQTTClass::SIMQTTState mqttState = SIMQTT.loop();
         //Check connection status

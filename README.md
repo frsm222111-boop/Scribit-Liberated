@@ -87,6 +87,15 @@ To reset the Wi-Fi configuration, press the button for at least 2 seconds. The d
 
 ### OTA Firmware
 
+#### Local Mode Firmware (No MQTT)
+After flashing local mode firmware (SI_MQTT_HOST empty):
+- After reset: LED double white flash → solid white
+- MBC-WB network disappears quickly
+- ScribIt-... network appears when LED solid
+- Connect to ScribIt-... network
+- Flash directly using espota.py (no WiFi config needed) (see next section)
+
+#### Original/Cloud Firmware
 - Compile the firmware.
 - When LED is flashing white fast, There's a new wifi called MCB-WB-.... , connect to it
 - Use OTA tool from Arduino IDE (Connect to `192.168.240.1` on port `3232` without a password.)
