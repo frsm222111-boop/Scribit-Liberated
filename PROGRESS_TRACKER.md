@@ -157,11 +157,13 @@ Response:
 
 **Pen Switching (4-color support):**
 - 4 pen holders mounted on revolving Z-axis cylinder
-- Hall sensor for homing reference point
-- `G77` - Home pen cylinder to position 0
-- Z-axis rotation angles: 0°, 90°, 180°, 270° (pens 0-3)
+- Hall sensor homing: `G77` (works but takes 60-90 sec, use once at start)
+- Z-axis rotation angles: 0°, 72°, 144°, 216° (pens 0-3) - **72° spacing**
+- Pen selection: `G1 Z[angle]` with absolute positioning (G90)
+- T-codes (T0/T1/T2/T3) don't work - use manual Z angles
+- G4 pause commands cause hangs - avoid them
 - Each pen can have different pressure calibration via `G101`
-- Test file created: `test-pen-switch.gcode`
+- Test file: `test-4-pens-final.gcode`
 
 **Erasing (ceramic heater):**
 - Fixed ceramic heater position
@@ -760,6 +762,47 @@ curl -v -X POST http://192.168.240.1:8888/upload \
 - Pen homing button (G77 command)
 - WebSocket for real-time status
 - G-code transformation in JavaScript
+
+### 2025-11-04 - Session 5 Continued (Pen Switching Testing)
+**Hardware Testing:**
+
+**Test Results:**
+1. **G28 (XY homing)** - Causes hang, avoid
+2. **G77 (pen cylinder homing)** - Works! Takes 60-90 sec, uses Hall sensor
+3. **T-codes (T0/T1/T2/T3)** - Don't work for pen selection
+4. **G4 pause commands** - Cause hangs, must avoid
+5. **Direct Z rotation** - Works perfectly: `G1 Z[angle]`
+6. **Pen spacing** - 72° apart (not 90°): 0°, 72°, 144°, 216°
+
+**Working Pattern:**
+```gcode
+M17              ; Enable motors
+G77              ; Home to pen 0 (60-90 sec)
+G90              ; Absolute Z positioning
+G91 X Y          ; Keep XY relative
+G1 Z0            ; Pen 0
+G1 Z72           ; Pen 1
+G1 Z144          ; Pen 2
+G1 Z216          ; Pen 3
+M18
+```
+
+**Files Created:**
+- `test-minimal.gcode` - Basic XY movement (works)
+- `test-z-axis.gcode` - Z rotation test (works)
+- `test-4-pens-final.gcode` - 4-pen switching with G77 homing (works)
+- `test-g77-only.gcode` - G77 Hall sensor homing (works)
+
+**Known Issues:**
+- G77 + G28 together cause hang
+- G4 pause commands cause hang
+- T-codes not implemented for pen switching
+- Hard-coded degrees required (investigating alternatives)
+
+**Next Steps:**
+- Investigate G-code macros or firmware commands for pen selection
+- Check if M-codes exist for tool/pen selection
+- Consider firmware modification to add T-code support
 
 ---
 
