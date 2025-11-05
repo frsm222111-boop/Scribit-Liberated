@@ -156,14 +156,20 @@ Response:
 ### Hardware Capabilities Research (2025-11-04)
 
 **Pen Switching (4-color support):**
-- 4 pen holders mounted on revolving Z-axis cylinder
-- Hall sensor homing: `G77` (works but takes 60-90 sec, use once at start)
-- Z-axis rotation angles: 0°, 72°, 144°, 216° (pens 0-3) - **72° spacing**
-- Pen selection: `G1 Z[angle]` with absolute positioning (G90)
+- 4 pen holders mounted on revolving Z-axis cylinder with **72° spacing**
+- Hall sensor homing: `G77` (works, takes 60-90 sec)
+- **CRITICAL:** G77 must be called before EACH pen switch to avoid mechanical jam
+- Continuous rotation in one direction causes pen cylinder to get stuck
+- Firmware pen positions (from `g101.h`):
+  - Pen 0: Z=89 (home position after G77)
+  - Pen 1: Z=161 (89 + 72)
+  - Pen 2: Z=233 (161 + 72)
+  - Pen 3: Z=305 (233 + 72)
+- Pen selection pattern: `G77` → `G1 Z[89/161/233/305]`
 - T-codes (T0/T1/T2/T3) don't work - use manual Z angles
 - G4 pause commands cause hangs - avoid them
 - Each pen can have different pressure calibration via `G101`
-- Test file: `test-4-pens-final.gcode`
+- **TODO:** Account for offset angle when setting pen Z position
 
 **Erasing (ceramic heater):**
 - Fixed ceramic heater position
@@ -774,16 +780,32 @@ curl -v -X POST http://192.168.240.1:8888/upload \
 5. **Direct Z rotation** - Works perfectly: `G1 Z[angle]`
 6. **Pen spacing** - 72° apart (not 90°): 0°, 72°, 144°, 216°
 
-**Working Pattern:**
+**Working Pattern (Updated):**
 ```gcode
 M17              ; Enable motors
-G77              ; Home to pen 0 (60-90 sec)
 G90              ; Absolute Z positioning
-G91 X Y          ; Keep XY relative
-G1 Z0            ; Pen 0
-G1 Z72           ; Pen 1
-G1 Z144          ; Pen 2
-G1 Z216          ; Pen 3
+
+; Pen 0
+G77              ; Home to pen 0 (60-90 sec)
+G1 Z89           ; Move to pen 0 position
+; [drawing commands]
+
+; Pen 1
+G77              ; Re-home before switch
+G1 Z161          ; Move to pen 1 position
+; [drawing commands]
+
+; Pen 2
+G77              ; Re-home before switch
+G1 Z233          ; Move to pen 2 position
+; [drawing commands]
+
+; Pen 3
+G77              ; Re-home before switch
+G1 Z305          ; Move to pen 3 position
+; [drawing commands]
+
+G77              ; Final home
 M18
 ```
 
@@ -797,12 +819,14 @@ M18
 - G77 + G28 together cause hang
 - G4 pause commands cause hang
 - T-codes not implemented for pen switching
-- Hard-coded degrees required (investigating alternatives)
+- Continuous Z rotation causes mechanical jam - must use G77 between pen changes
+- Pen cylinder can get stuck if rotated too many times in one direction
 
 **Next Steps:**
-- Investigate G-code macros or firmware commands for pen selection
-- Check if M-codes exist for tool/pen selection
-- Consider firmware modification to add T-code support
+- ✅ Found firmware pen positions in g101.h (Z=89/161/233/305)
+- ✅ Determined G77 must be called before each pen switch
+- ⏳ Need to account for offset angle when calculating pen Z positions
+- ⏳ Implement pen switching in Phase 2 web UI with proper G77 calls
 
 ---
 
