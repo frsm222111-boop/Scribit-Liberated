@@ -284,12 +284,20 @@ void ScribIt::handleHTTPRequests()
             break;
         }
 
+        //Get pause state
+        PausedState ps = sm.getPausedState();
+        const char *pauseStr = "running";
+        if (ps == SIPS_PAUSED)
+            pauseStr = "paused";
+        else if (ps == SIPS_REQUESTED)
+            pauseStr = "pausing";
+
         client.println("HTTP/1.1 200 OK");
         client.println("Content-Type: application/json");
         client.println("Access-Control-Allow-Origin: *");
         client.println();
-        client.printf("{\"state\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\"}\n",
-                      stateStr, m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5]);
+        client.printf("{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\"}\n",
+                      stateStr, pauseStr, m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5]);
     }
     else if (path == "/upload" && method == "POST")
     {
@@ -338,6 +346,73 @@ void ScribIt::handleHTTPRequests()
                 client.println("Content-Type: application/json");
                 client.println();
                 client.println("{\"error\":\"SPIFFS write failed\"}");
+            }
+        }
+    }
+    else if (path == "/pause" && method == "POST")
+    {
+        //Pause g-code execution
+        if (m_state != SI_PRINTING && m_state != SI_ERASING)
+        {
+            client.println("HTTP/1.1 409 Conflict");
+            client.println("Content-Type: application/json");
+            client.println();
+            client.printf("{\"error\":\"Cannot pause in state %d\"}\n", m_state);
+        }
+        else
+        {
+            PausedState ps = sm.getPausedState();
+            if (ps != SIPS_RUNNING)
+            {
+                client.println("HTTP/1.1 409 Conflict");
+                client.println("Content-Type: application/json");
+                client.println();
+                const char *pauseState = (ps == SIPS_PAUSED ? "paused" : "pause requested");
+                client.printf("{\"error\":\"Already %s\"}\n", pauseState);
+            }
+            else
+            {
+                sm.setPause(true);
+                //Stop printing timer
+                m_printingTime += millis() - m_startPrintingT;
+
+                client.println("HTTP/1.1 200 OK");
+                client.println("Content-Type: application/json");
+                client.println();
+                client.println("{\"status\":\"paused\"}");
+            }
+        }
+    }
+    else if (path == "/resume" && method == "POST")
+    {
+        //Resume g-code execution
+        if (m_state != SI_PRINTING && m_state != SI_ERASING)
+        {
+            client.println("HTTP/1.1 409 Conflict");
+            client.println("Content-Type: application/json");
+            client.println();
+            client.printf("{\"error\":\"Cannot resume in state %d\"}\n", m_state);
+        }
+        else
+        {
+            PausedState ps = sm.getPausedState();
+            if (ps == SIPS_RUNNING)
+            {
+                client.println("HTTP/1.1 409 Conflict");
+                client.println("Content-Type: application/json");
+                client.println();
+                client.println("{\"error\":\"Not paused\"}");
+            }
+            else
+            {
+                sm.setPause(false);
+                //Restart printing timer
+                m_startPrintingT = millis();
+
+                client.println("HTTP/1.1 200 OK");
+                client.println("Content-Type: application/json");
+                client.println();
+                client.println("{\"status\":\"resumed\"}");
             }
         }
     }

@@ -9,7 +9,7 @@ Enable Scribit to execute g-code files locally without dependency on offline clo
 - **Hardware:** ✅ Physical Scribit robot available
 - **Boot Status:** ✅ Firmware boots to IDLE state (solid white LED)
 - **WiFi Status:** ✅ ScribIt-... AP mode active, ping responds
-- **HTTP Server:** ✅ Running on port 8888 with /status and /upload endpoints
+- **HTTP Server:** ✅ Running on port 8888 with /status, /upload, /pause, /resume endpoints
 - **G-code Execution:** ✅ Uploaded g-code executes, motors move
 - **Next Phase:** Phase 2 (Web Interface) or Phase 4 (G-code conversion tools)
 
@@ -140,10 +140,12 @@ Response:
 **Actual Time:** ~4 hours
 
 **Test Results (2025-11-03):**
-- ✅ `GET /status` returns `{"state":"IDLE","id":"..."}`
+- ✅ `GET /status` returns `{"state":"IDLE","paused":"running","id":"..."}`
 - ✅ `POST /upload` with test.gcode returns `{"status":"uploaded","size":XX}`
 - ✅ Motors executed uploaded g-code immediately after upload
 - ✅ Device transitioned to PRINTING state
+- ✅ `POST /pause` pauses execution during print
+- ✅ `POST /resume` resumes paused execution
 
 ---
 
@@ -211,10 +213,11 @@ Response:
 GET  /                → Serve index.html
 GET  /app.js          → Serve JavaScript app
 GET  /style.css       → Serve CSS
-GET  /status          → JSON status (existing)
+GET  /status          → JSON status with pause state (existing)
 POST /upload          → G-code upload (existing from Phase 1)
+POST /pause           → Pause g-code execution (existing)
+POST /resume          → Resume paused execution (existing)
 POST /command         → Send single g-code command (e.g., G77 for pen homing)
-POST /control         → Start/pause/stop commands
 GET  /files           → List uploaded files (future)
 WS   /ws              → WebSocket status updates
 ```
@@ -833,6 +836,37 @@ M18
 - ✅ Determined G77 must be called before each pen switch
 - ⏳ Need to account for offset angle when calculating pen Z positions
 - ⏳ Implement pen switching in Phase 2 web UI with proper G77 calls
+
+### 2025-11-04 - Session 6 (Pause/Resume HTTP Endpoints)
+**HTTP API Enhancement:**
+
+**Changes Made:**
+1. Added `POST /pause` endpoint to pause g-code execution during print/erase
+2. Added `POST /resume` endpoint to resume paused execution
+3. Enhanced `GET /status` to include pause state (`running`/`pausing`/`paused`)
+4. Implemented proper printing timer handling (stops on pause, resumes on continue)
+
+**Implementation Details:**
+- Uses `sm.setPause(true/false)` to control g-code streaming
+- Checks pause state with `sm.getPausedState()` (returns SIPS_RUNNING, SIPS_REQUESTED, or SIPS_PAUSED)
+- Returns 409 Conflict if pause/resume called in wrong state
+- Only works during SI_PRINTING or SI_ERASING states
+- Maintains elapsed time tracking across pause/resume cycles
+
+**Files Modified:**
+- `Firmware/ScribitESP/ScribIt_wifi.cpp` - Added pause/resume endpoints, enhanced status response
+- `PROGRESS_TRACKER.md` - Updated endpoint documentation
+
+**API Behavior:**
+```
+GET /status → {"state":"PRINTING","paused":"running","id":"..."}
+POST /pause → {"status":"paused"} (or error if already paused)
+POST /resume → {"status":"resumed"} (or error if not paused)
+```
+
+**Next Steps:**
+- Ready for Phase 2 web UI implementation with pause/resume controls
+- Consider adding stop/cancel endpoint for aborting current job
 
 ---
 
