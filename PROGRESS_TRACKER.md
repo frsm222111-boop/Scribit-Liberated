@@ -165,11 +165,13 @@ Response:
   - Pen 1: Z=161 (89 + 72)
   - Pen 2: Z=233 (161 + 72)
   - Pen 3: Z=305 (233 + 72)
-- Pen selection pattern: `G77` → `G1 Z[89/161/233/305]`
+- **Complete pen selection pattern:** `G77` → `G1 Z[89/161/233/305]` → `G101`
+  - G77: Home to pen 0
+  - G1 Z[angle]: Rotate to pen position
+  - G101: Apply pen pressure/offset against wall (moves ~30° inward)
 - T-codes (T0/T1/T2/T3) don't work - use manual Z angles
 - G4 pause commands cause hangs - avoid them
-- Each pen can have different pressure calibration via `G101`
-- **TODO:** Account for offset angle when setting pen Z position
+- Each pen has calibrated pressure stored in g_timeLimit[] array
 
 **Erasing (ceramic heater):**
 - Fixed ceramic heater position
@@ -780,7 +782,7 @@ curl -v -X POST http://192.168.240.1:8888/upload \
 5. **Direct Z rotation** - Works perfectly: `G1 Z[angle]`
 6. **Pen spacing** - 72° apart (not 90°): 0°, 72°, 144°, 216°
 
-**Working Pattern (Updated):**
+**Working Pattern (Final):**
 ```gcode
 M17              ; Enable motors
 G90              ; Absolute Z positioning
@@ -788,21 +790,25 @@ G90              ; Absolute Z positioning
 ; Pen 0
 G77              ; Home to pen 0 (60-90 sec)
 G1 Z89           ; Move to pen 0 position
+G101             ; Apply pen pressure
 ; [drawing commands]
 
 ; Pen 1
 G77              ; Re-home before switch
 G1 Z161          ; Move to pen 1 position
+G101             ; Apply pen pressure
 ; [drawing commands]
 
 ; Pen 2
 G77              ; Re-home before switch
 G1 Z233          ; Move to pen 2 position
+G101             ; Apply pen pressure
 ; [drawing commands]
 
 ; Pen 3
 G77              ; Re-home before switch
 G1 Z305          ; Move to pen 3 position
+G101             ; Apply pen pressure
 ; [drawing commands]
 
 G77              ; Final home
