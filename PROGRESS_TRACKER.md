@@ -868,6 +868,52 @@ POST /resume → {"status":"resumed"} (or error if not paused)
 - Ready for Phase 2 web UI implementation with pause/resume controls
 - Consider adding stop/cancel endpoint for aborting current job
 
+### 2025-11-05 - Session 7 (Auto-Calibration Analysis)
+**Calibration Research:**
+
+**File Analyzed:**
+- `extrafile/autocal.gcode` - Cloud-based auto-calibration routine
+- Created `extrafile/autocal-annotated.gcode` - Fully commented version
+
+**Auto-Calibration Process:**
+1. **Movement Pattern:** 150mm square (relative positioning)
+   - Start: Top-right corner
+   - Path: Right → Down → Left → Up → Right
+2. **IMU Readings:** M777 command at each of 4 corners
+   - Reads gyroscope pitch angle (averages 10 samples)
+   - Outputs: `OK I:<pitch_angle>`
+   - Requires stable pen contact with wall
+3. **Cloud Processing:** Receives 4 pitch readings, calculates:
+   - Wall dimensions (width × height)
+   - Wall orientation/skew
+   - Coordinate transformation matrix
+   - Pen pressure calibration
+
+**Special Commands Discovered:**
+- **M92 X Y** - Set steps-per-mm (Y=-29.6 inverts Y-axis)
+- **M400** - Synchronize planner (wait for buffered moves)
+- **M777** - Read IMU pitch (custom Scribit command)
+  - Location: `Firmware/MK4duo/src/core/commands/gcode/scribit/m777.h`
+  - Takes 10 IMU samples, averages pitch angle
+  - 500ms wait before reading for stability
+- **G4 P<ms>** - Pause/dwell (works in calibration, hangs in prints!)
+
+**Key Insights:**
+- Auto-calibration **requires cloud API** (not available locally)
+- Uses **relative positioning (G91)** for simple square pattern
+- G4 pauses work here but fail elsewhere (firmware inconsistency)
+- M92 calibration-specific (29.6 steps/mm, negative Y)
+- Pattern assumes 150mm × 150mm minimum wall area
+
+**Impact on Phase 2:**
+- Manual calibration helper still needed (cloud unavailable)
+- Could implement local M777 reading display (raw angles)
+- Cannot replicate cloud transform calculations locally
+- Web UI should guide manual wall measurement input
+
+**Files Created:**
+- `extrafile/autocal-annotated.gcode` - Detailed comment annotations
+
 ---
 
 ## Phase 5: Advanced Features (Future) 🚀
