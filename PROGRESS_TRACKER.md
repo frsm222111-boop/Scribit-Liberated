@@ -914,6 +914,75 @@ POST /resume → {"status":"resumed"} (or error if not paused)
 **Files Created:**
 - `extrafile/autocal-annotated.gcode` - Detailed comment annotations
 
+### 2025-11-05 - Session 8 (Cloud Calibration API & Coordinate System)
+**Calibration & Kinematics Research:**
+
+**Q1: Does Scribit use special triangular coordinate system?**
+**A: NO - Standard Cartesian coordinates in g-code**
+
+- Firmware configured as `MECH_CARTESIAN` (not CoreXY/Delta)
+- No coordinate transformation in planner (planner.cpp:2605)
+- X/Y map directly to motor steps via `axis_steps_per_mm`
+- Triangular geometry encoded in calibration constants (30.5577 steps/mm)
+- SVG→gcode converters can use standard Cartesian output
+
+**Q2: How crucial is cloud calibration? Can we mock it?**
+**A: VERY crucial (8/10), but mockable (7/10)**
+
+**Cloud API Flow:**
+1. Downloads `autocal.gcode` from cloud
+2. Runs 150mm square pattern, collects 4 IMU readings
+3. POSTs to calibration API:
+   ```json
+   {"sn": "deviceID", "wallId": 1, "scans": [453, 461, 448, 455]}
+   ```
+4. API returns starting position:
+   ```json
+   {"command": "G92 X0 Y0\nG1 X100 Y75 F1000"}
+   ```
+5. Firmware sends commands to SAMD21
+
+**What Cloud API Calculates:**
+- Wall dimensions from IMU angle changes
+- Wall orientation/tilt
+- String lengths (motor positions)
+- Coordinate transform matrix
+- Starting position (X/Y coordinates)
+- Optimal steps-per-mm for wall geometry
+
+**Mockability Options:**
+
+| Approach | Difficulty | Accuracy | Local Mode |
+|----------|-----------|----------|------------|
+| Fixed position | Easy | Low | ❌ Wrong scale |
+| Basic math | Medium | Medium | ⚠️ Approximate |
+| **Manual helper** | Easy | **Good** | ✅ **Recommended** |
+| Skip calibration | Easy | None | ❌ Unusable |
+
+**Recommended: Manual Calibration Helper (Phase 2)**
+- Web UI: User inputs wall width/height
+- User positions pen at top-right corner
+- Generate: `G92 X0 Y0\nG1 X{w/2} Y{h/2} F1000`
+- Send via `/command` endpoint
+- Store per wall ID (multi-wall support)
+- Optional: Display real-time IMU readings
+
+**Key Code Locations:**
+- ESP32: `ScribIt.cpp:735-845` (startCalibration, completeCalibration)
+- ESP32: `SIFileDownloader.cpp:247-346` (API call with hardcoded token)
+- ESP32: `SIConfig.hpp:43-46` (SI_CALIBRATION_URL, SI_CALIBRATION_POINT_NUMBER)
+- SAMD21: `Configuration_Overall.h:335` (DEFAULT_AXIS_STEPS_PER_UNIT)
+- Auth token: `cmJqv3ah7nPj3OVGoNyevDXs7LwNJbIW` (hardcoded in source)
+
+**Impact on Phases:**
+- Phase 2: Add manual calibration form + `/command` endpoint
+- Phase 4: Standard Cartesian g-code works (no special coordinates needed)
+- Future: Could implement basic IMU-based calculation (no cloud)
+
+**Files Created:**
+- `docs/coordinate-system-analysis.md` - Kinematics explanation
+- `docs/calibration-cloud-api-analysis.md` - Full API breakdown + mock strategies
+
 ---
 
 ## Phase 5: Advanced Features (Future) 🚀
