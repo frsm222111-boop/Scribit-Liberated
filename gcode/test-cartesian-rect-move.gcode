@@ -6,39 +6,12 @@
 ; Finding: Listen to motor sounds - should have 4 distinct movements
 ; ===================================================================
 
-M17                    ; Enable stepper motors
-
-; Use relative positioning for safety
-G91                    ; Set to relative positioning mode
-
-; Small delay to settle
-G4 P500
-
-; Pen stays UP (no M18 E command)
-
-; Move in rectangle: 40mm wide x 30mm tall
-; Starting from current position, going clockwise
-
-; Right side (40mm in +X direction)
-G1 X40 F1000
-G4 P200
-
-; Down (30mm in +Y direction)
-G1 Y30 F1000
-G4 P200
-
-; Left side (40mm in -X direction)
-G1 X-40 F1000
-G4 P200
-
-; Up (30mm in -Y direction, back to start)
-G1 Y-30 F1000
-G4 P200
-
-; Return to absolute mode
-G90
-
-; Disable motors
+M17
+G91
+G1 F1000 X40
+G1 F1000 Y30
+G1 F1000 X-40
+G1 F1000 Y-30
 M18
 
 ; ===================================================================
