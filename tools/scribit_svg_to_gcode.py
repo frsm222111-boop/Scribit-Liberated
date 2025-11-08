@@ -173,12 +173,16 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
 
     gcode_lines = [
         "M17",  # Enable steppers
-        "G91",  # Relative positioning
+        "G77",  # Pen holder calibration
+        "G90",  # Absolute positioning for pen
+        "G1 Z89",  # Select pen 1, pen up position
+        "G91",  # Relative positioning for movement
         "G1 F1000",  # Set feedrate
     ]
 
     current_L = left_length
     current_R = right_length
+    pen_is_down = False
 
     # Process each path
     for path_data in paths:
@@ -194,6 +198,17 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             svg_center_y = (svg_min_y + svg_max_y) / 2
 
         for svg_x, svg_y, pen_down in points:
+            # Handle pen up/down
+            if pen_down and not pen_is_down:
+                # Lower pen
+                gcode_lines.append("G101")
+                pen_is_down = True
+            elif not pen_down and pen_is_down:
+                # Raise pen
+                gcode_lines.append("G90")
+                gcode_lines.append("G1 Z89")
+                gcode_lines.append("G91")
+                pen_is_down = False
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
             relative_x = (svg_x - svg_center_x) * scale
@@ -214,6 +229,13 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
 
             current_L = target_L
             current_R = target_R
+
+    # Ensure pen is up before returning
+    if pen_is_down:
+        gcode_lines.append("G90")
+        gcode_lines.append("G1 Z89")
+        gcode_lines.append("G91")
+        pen_is_down = False
 
     # Return to starting position
     delta_L = left_length - current_L
