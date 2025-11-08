@@ -215,6 +215,13 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             current_L = target_L
             current_R = target_R
 
+    # Return to starting position
+    delta_L = left_length - current_L
+    delta_R = right_length - current_R
+    gcode_lines.append(f"G1 X{delta_L:.3f} Y{-delta_R:.3f}")
+    current_L = left_length
+    current_R = right_length
+
     gcode_lines.append("M18")  # Disable steppers
 
     return gcode_lines, current_L, current_R
