@@ -3,7 +3,8 @@
     "allow": [
       "Bash(gh issue create:*)",
       "Bash(docker-compose run:*)",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

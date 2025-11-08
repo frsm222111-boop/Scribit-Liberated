@@ -1112,8 +1112,119 @@ Each phase should include:
 
 ---
 
-_Last Updated: 2025-11-03_
+### 2025-11-06 - Session 9 (Kinematics Investigation - CoreXY Failed)
+**Phase 4 Blocker - Coordinate System Deep Dive:**
+
+**Investigation Goal:**
+Determine if firmware handles Cartesian coordinates or requires external conversion to string-space.
+
+**Tests Performed:**
+1. **Enabled CoreXY Mode:**
+   - Modified `Configuration_Overall.h` to use `MECH_COREXY` instead of `MECH_CARTESIAN`
+   - Added `CORE_FACTOR 1` for standard CoreXY transform
+   - Built firmware successfully
+   - Flashed and tested with Cartesian G-code
+
+2. **Test Results:**
+   - Device moved "more straight but not completely"
+   - Still not proper Cartesian motion
+   - CoreXY improves but fundamentally incompatible
+
+**Root Cause Discovery:**
+
+**CoreXY Limitation:**
+- CoreXY uses **linear** transform: `Motor A = X + constant*Y`, `Motor B = X - constant*Y`
+- Assumes **constant factor** between motors
+- Works for perpendicular belt systems
+
+**Scribit Reality:**
+- Uses **nonlinear** string geometry: `L1 = sqrt((X-x1)² + (Y-y1)²)`
+- Ratio between motors **varies with position**
+- Cannot be expressed as linear transform
+
+**Critical Discovery: Firmware NEVER Did Cartesian Transform!**
+
+Evidence found:
+1. `MECH_CARTESIAN` has no transform function (cartesian_mechanics.cpp:109-113)
+2. X/Y values in G-code **ARE the string lengths directly**
+3. `planner.cpp:2605` maps positions without transformation
+4. Original system architecture:
+   ```
+   [User SVG/Drawing]
+        ↓
+   [Cloud API / Mobile App]  ← Does Cartesian → String conversion
+        ↓
+   [G-code in String-Space]  ← X=left string, Y=right string
+        ↓
+   [Firmware]  ← No transform, direct motor control
+        ↓
+   [Motors]
+   ```
+
+**Why We Were Confused:**
+- `DEFAULT_AXIS_STEPS_PER_UNIT` calibration values seemed like transform
+- Actually just motor scaling (steps → mm), NOT coordinate conversion
+- Cloud calibration doesn't transform firmware, provides pre-converted G-code
+
+**Implications for Phase 4:**
+
+❌ **Cannot use standard SVG-to-G-code tools directly**
+✅ **Must implement Cartesian → string-length converter**
+
+**Two Implementation Paths:**
+
+1. **External Preprocessing (RECOMMENDED - matches original):**
+   - Python library for kinematics
+   - Convert Cartesian G-code → string-space before upload
+   - Same architecture as original cloud system
+   - Easier to implement and test
+
+2. **Firmware Kinematics (harder, more elegant):**
+   - Implement `scribit_mechanics.cpp` like delta printers
+   - Add proper Transform/InverseTransform functions
+   - Enable true Cartesian G-code support
+   - Requires anchor position data
+
+**Blockers:**
+- Need anchor positions (x1,y1), (x2,y2) for conversion math
+- Sources: physical measurement, calibration API analysis, reverse engineering
+
+**Actions Taken:**
+- ✅ Tested CoreXY mode (failed as expected)
+- ✅ Analyzed firmware kinematics architecture
+- ✅ Documented findings in `docs/COREXY_FAILED_ANALYSIS.md`
+- ✅ Documented complete plan in `docs/inverse_kinematics_plan.md`
+- ✅ Reverted firmware to `MECH_CARTESIAN`
+- ✅ Created test files for verification
+
+**Files Created:**
+- `docs/inverse_kinematics_plan.md` - Complete analysis & 3 solution options
+- `docs/COREXY_IMPLEMENTATION.md` - CoreXY attempt documentation
+- `docs/COREXY_FAILED_ANALYSIS.md` - Why CoreXY doesn't work
+- `BUILD_COREXY_FIRMWARE.md` - Build results
+- `gcode/test-corexy-cartesian.gcode` - Test file (simplified)
+- `gcode/test-corexy-diagonal.gcode` - Test file (simplified)
+
+**Next Steps for Phase 4:**
+1. **Find anchor positions** - critical for any solution:
+   - Run calibration, capture API response
+   - Physical measurement of device
+   - Reverse engineer from working G-code
+2. **Build Python converter** (external preprocessing):
+   - Implement string-length kinematics
+   - SVG → string-space G-code converter
+   - Test with simple shapes
+3. **(Optional) Firmware implementation:**
+   - Port converter to C++
+   - Implement scribit_mechanics class
+   - Enable true Cartesian support
+
+**Status:** Phase 4 architecture clarified, path forward identified
+
+---
+
+_Last Updated: 2025-11-06_
 _Current Phase: Phase 1 - HTTP G-code Upload - ✅ COMPLETE_
-_Current Status: Fully functional local g-code upload and execution via HTTP_
-_Next Milestone: Phase 2 (Web UI) or Phase 4 (G-code conversion tools)_
-_Recommended Next Step: Decide on next feature: web interface vs SVG converter_
+_Current Status: Kinematics investigation complete, external converter required_
+_Next Milestone: Phase 4 - External Cartesian → String-Space Converter_
+_Blocker: Need anchor positions for conversion math_

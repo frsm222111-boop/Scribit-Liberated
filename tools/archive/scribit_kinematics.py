@@ -52,6 +52,7 @@ class ScribitKinematics:
 
         Returns:
             (L1, L2): Left and right string lengths in mm
+            NOTE: Returns as (right_string, left_string) because firmware has X=right, Y=left
         """
         # Account for pen being above cylinder center (extends toward wall)
         cylinder_y = py + self.pen_offset
@@ -65,17 +66,18 @@ class ScribitKinematics:
         right_motor_y = cylinder_y
 
         # Calculate string lengths from anchors to motors
-        L1 = math.sqrt(
+        left_string = math.sqrt(
             (self.anchor_left[0] - left_motor_x) ** 2 +
             (self.anchor_left[1] - left_motor_y) ** 2
         )
 
-        L2 = math.sqrt(
+        right_string = math.sqrt(
             (self.anchor_right[0] - right_motor_x) ** 2 +
             (self.anchor_right[1] - right_motor_y) ** 2
         )
 
-        return L1, L2
+        # SWAP: Firmware has X=right motor, Y=left motor
+        return right_string, left_string
 
     def strings_to_cartesian(self, L1: float, L2: float, iterations: int = 5) -> Optional[Tuple[float, float]]:
         """
@@ -84,29 +86,32 @@ class ScribitKinematics:
         Uses iterative refinement to account for motor and pen offsets.
 
         Args:
-            L1: Left string length (mm)
-            L2: Right string length (mm)
+            L1: Right string length (mm) - firmware X motor
+            L2: Left string length (mm) - firmware Y motor
             iterations: Number of refinement iterations (default 5)
 
         Returns:
             (px, py): Pen position in mm, or None if no solution
         """
+        # SWAP: L1=right, L2=left (firmware mapping)
+        right_string = L1
+        left_string = L2
         d = self.anchor_spacing  # Distance between anchors
 
         # Check if solution exists (rough check)
-        if L1 + L2 < d:
+        if right_string + left_string < d:
             return None  # Strings too short
-        if abs(L1 - L2) > d + 200:  # Some margin for offsets
+        if abs(right_string - left_string) > d + 200:  # Some margin for offsets
             return None  # One string too short
 
         # Initial guess: solve for point assuming no offsets
-        # Two circles: center at anchors, radii L1 and L2
-        a = (L1**2 - L2**2 + d**2) / (2 * d)
+        # Two circles: left anchor with left_string radius, right anchor with right_string radius
+        a = (left_string**2 - right_string**2 + d**2) / (2 * d)
 
-        if L1**2 - a**2 < 0:
+        if left_string**2 - a**2 < 0:
             return None
 
-        h = math.sqrt(L1**2 - a**2)
+        h = math.sqrt(left_string**2 - a**2)
 
         # Initial guess (this is where left motor would be, approximately)
         px = a
