@@ -55,16 +55,16 @@ def main():
     if not args.quiet:
         print(f"Current position: x={x_current:.2f}mm, y={y_current:.2f}mm")
 
-    # Move down
-    x_target_down = x_current + args.distance
-    left_target_down, right_target_down = calculate_string_lengths(args.anchor_distance, x_target_down, y_current)
+    # Move down - keep X constant, increase Y
+    y_target_down = y_current + args.distance
+    left_target_down, right_target_down = calculate_string_lengths(args.anchor_distance, x_current, y_target_down)
 
     left_delta_down = left_target_down - args.left_length
     right_delta_down = right_target_down - args.right_length
 
     if not args.quiet:
         print(f"\nMove {args.distance}mm down:")
-        print(f"  New position: x={x_target_down:.2f}mm, y={y_current:.2f}mm")
+        print(f"  New position: x={x_current:.2f}mm, y={y_target_down:.2f}mm")
         print(f"  String lengths: L={left_target_down:.2f}mm, R={right_target_down:.2f}mm")
 
     # Move back to start
