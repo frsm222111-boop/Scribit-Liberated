@@ -4,7 +4,9 @@
       "Bash(gh issue create:*)",
       "Bash(docker-compose run:*)",
       "Bash(docker-compose:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []
