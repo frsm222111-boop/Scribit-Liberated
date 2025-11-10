@@ -8,17 +8,41 @@ Features:
 - Path optimization (greedy nearest-neighbor)
 - Auto-centering and scaling
 - Proper G91 coordinate mapping with Y-negation
-- Correct pen control mechanism (Z-100 for down, Z100 for up)
+- ALL 4 PENS WORKING with final simple method!
 
 CRITICAL: G91 coordinate mapping requires negating the right string delta!
 - G-code X = left string delta
 - G-code Y = -right string delta (NEGATED!)
 
-PEN CONTROL (VERIFIED WORKING):
-- Pen selection: G90, G1 Z[ready] (172/244/316 for pens 1-3)
-- Pen down: G101 followed by G1 Z-100 (TWO-STAGE required!)
-- Pen up: G1 Z100 (single command)
-- Working pens: 1-3 (pen 4 has mechanical issues)
+PEN CONTROL (FINAL SIMPLE METHOD - VERIFIED ON HARDWARE):
+Initialization (ONCE at start):
+  M17          ; Enable steppers
+  G77          ; Home cylinder
+  G90          ; Absolute mode
+  G1 Z89       ; Select pen 1 (or 161/233/305 for pens 2/3/4)
+  G101         ; Correct overshoot
+  G91          ; Relative mode
+  G1 F1000     ; Set feedrate
+
+Pen Down (forward-back motion creates contact):
+  G1 Z72       ; Move forward
+  G1 Z-72      ; Move back = PEN DOWN!
+
+Pen Up (from -72 position):
+  G1 Z72       ; Move forward = PEN UP!
+
+Pen Switching:
+  G1 Z72       ; Pen up if down
+  G90          ; Absolute mode
+  G1 Z[position]  ; Select new pen (89/161/233/305)
+  G101         ; Correct overshoot
+  G91          ; Relative mode
+
+Color to Pen Mapping:
+  Black (default) -> Pen 1 (Z89)
+  Red            -> Pen 2 (Z161)
+  Blue           -> Pen 3 (Z233)
+  Green          -> Pen 4 (Z305)
 """
 
 import math
@@ -39,16 +63,15 @@ def calculate_string_lengths(anchor_distance, x, y):
     return left_length, right_length
 
 def get_color_pen(color_str):
-    """Map color to pen number (1-3). Pen 4 doesn't work reliably."""
+    """Map color to pen number (1-4). All pens now working!"""
     if not color_str or color_str in ['black', '#000000', '#000', 'none']:
         return 1  # Default pen
 
-    # Simple color mapping - only pens 1-3 work
-    # Pen 4 (green) mapped to pen 3 due to mechanical issues
+    # Simple color mapping - all 4 pens work with new method
     color_map = {
         'red': 2, '#ff0000': 2, '#f00': 2,
         'blue': 3, '#0000ff': 3, '#00f': 3,
-        'green': 3, '#00ff00': 3, '#0f0': 3,  # Pen 4 -> 3
+        'green': 4, '#00ff00': 4, '#0f0': 4,
     }
 
     return color_map.get(color_str.lower(), 1)
@@ -536,40 +559,41 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
     # Calculate starting position (center of drawing)
     start_x, start_y = calculate_position(anchor_distance, left_length, right_length)
 
-    # Pen Z positions (tested and verified)
-    # Only pens 1-3 work reliably (pen 4 has mechanical issues)
-    PEN_Z_READY = {1: 172, 2: 244, 3: 316}
+    # Pen Z positions (absolute) - ALL 4 PENS WORKING!
+    PEN_Z_ABSOLUTE = {1: 89, 2: 161, 3: 233, 4: 305}
 
     gcode_lines = [
-        "M17",  # Enable steppers
-        "G77",  # Pen holder calibration
-        "G90",  # Absolute mode
-        "G1 Z172",  # Select pen 1 ready position
-        "G91",  # Relative mode for movements
+        "M17",   # Enable steppers
+        "G77",   # Home cylinder (ONCE at start)
+        "G90",   # Absolute mode
+        "G1 Z89",  # Select pen 1
+        "G101",  # Correct overshoot
+        "G91",   # Relative mode for movements
         "G1 F1000",  # Set feedrate
     ]
 
     current_L = left_length
     current_R = right_length
-    pen_is_down = False
+    pen_z_relative = 0  # Track relative Z position (0 = up, -72 = down)
     current_pen = 1
 
     # Process each path
     for path_data, pen_number in paths:
-        # Limit to pens 1-3 (pen 4 doesn't work)
-        if pen_number > 3:
-            pen_number = 3  # Fallback to pen 3
+        # All 4 pens now work!
+        if pen_number > 4:
+            pen_number = 1  # Fallback to pen 1
 
         # Switch pen if needed
         if pen_number != current_pen:
-            # Raise current pen if down
-            if pen_is_down:
-                gcode_lines.append("G1 Z100")  # Pen up
-                pen_is_down = False
+            # Raise current pen if down (from -72 to 0)
+            if pen_z_relative == -72:
+                gcode_lines.append("G1 Z72")  # Pen up
+                pen_z_relative = 0
 
             # Select new pen (absolute positioning)
             gcode_lines.append("G90")  # Absolute mode
-            gcode_lines.append(f"G1 Z{PEN_Z_READY[pen_number]}")  # Ready position
+            gcode_lines.append(f"G1 Z{PEN_Z_ABSOLUTE[pen_number]}")  # Select pen
+            gcode_lines.append("G101")  # Correct overshoot
             gcode_lines.append("G91")  # Back to relative mode
             current_pen = pen_number
 
@@ -585,16 +609,16 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             svg_center_y = (svg_min_y + svg_max_y) / 2
 
         for svg_x, svg_y, pen_down in points:
-            # Handle pen up/down
-            if pen_down and not pen_is_down:
-                # Lower pen (TWO-STAGE: G101 then G1 Z-100)
-                gcode_lines.append("G101")     # Stage 1: Initial contact
-                gcode_lines.append("G1 Z-100") # Stage 2: Full extension
-                pen_is_down = True
-            elif not pen_down and pen_is_down:
-                # Raise pen (single command)
-                gcode_lines.append("G1 Z100")
-                pen_is_down = False
+            # Handle pen up/down (FINAL SIMPLE METHOD)
+            if pen_down and pen_z_relative == 0:
+                # Lower pen (forward-back motion)
+                gcode_lines.append("G1 Z72")   # Forward
+                gcode_lines.append("G1 Z-72")  # Back = PEN DOWN!
+                pen_z_relative = -72
+            elif not pen_down and pen_z_relative == -72:
+                # Raise pen (forward motion from -72)
+                gcode_lines.append("G1 Z72")
+                pen_z_relative = 0
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
             relative_x = (svg_x - svg_center_x) * scale
@@ -617,9 +641,9 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             current_R = target_R
 
     # Ensure pen is up before returning
-    if pen_is_down:
-        gcode_lines.append("G1 Z100")  # Pen up (relative)
-        pen_is_down = False
+    if pen_z_relative == -72:
+        gcode_lines.append("G1 Z72")  # Pen up
+        pen_z_relative = 0
 
     # Return to starting position
     delta_L = left_length - current_L
