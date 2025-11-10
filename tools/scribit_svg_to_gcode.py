@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
 """
-Scribit SVG to G-code converter using correct G91 coordinate mapping.
+Scribit SVG to G-code converter - Full-featured edition.
 
-Converts SVG paths to G-code with proper kinematics and Y-negation.
+Features:
+- Complete SVG path support (M, L, H, V, C, S, Q, T, A, Z)
+- Multi-color pen switching (auto-detects stroke/fill colors)
+- Path optimization (greedy nearest-neighbor)
+- Auto-centering and scaling
+- Proper G91 coordinate mapping with Y-negation
+- Correct pen control mechanism (Z-100 for down, Z100 for up)
 
 CRITICAL: G91 coordinate mapping requires negating the right string delta!
 - G-code X = left string delta
 - G-code Y = -right string delta (NEGATED!)
+
+PEN CONTROL (VERIFIED WORKING):
+- Pen selection: G90, G1 Z[ready] (172/244/316 for pens 1-3)
+- Pen down: G101 followed by G1 Z-100 (TWO-STAGE required!)
+- Pen up: G1 Z100 (single command)
+- Working pens: 1-3 (pen 4 has mechanical issues)
 """
 
 import math
@@ -26,12 +38,27 @@ def calculate_string_lengths(anchor_distance, x, y):
     right_length = math.sqrt((anchor_distance - x)**2 + y**2)
     return left_length, right_length
 
+def get_color_pen(color_str):
+    """Map color to pen number (1-3). Pen 4 doesn't work reliably."""
+    if not color_str or color_str in ['black', '#000000', '#000', 'none']:
+        return 1  # Default pen
+
+    # Simple color mapping - only pens 1-3 work
+    # Pen 4 (green) mapped to pen 3 due to mechanical issues
+    color_map = {
+        'red': 2, '#ff0000': 2, '#f00': 2,
+        'blue': 3, '#0000ff': 3, '#00f': 3,
+        'green': 3, '#00ff00': 3, '#0f0': 3,  # Pen 4 -> 3
+    }
+
+    return color_map.get(color_str.lower(), 1)
+
 def parse_svg_paths(svg_file):
     """
-    Parse SVG file and extract path elements.
+    Parse SVG file and extract path elements with color info.
 
     Returns:
-        List of path 'd' attribute strings
+        List of (path_d, pen_number) tuples
     """
     tree = ET.parse(svg_file)
     root = tree.getroot()
@@ -46,23 +73,126 @@ def parse_svg_paths(svg_file):
     for path in root.findall('.//svg:path', ns):
         d = path.get('d')
         if d:
-            paths.append(d)
+            # Get stroke or fill color
+            stroke = path.get('stroke')
+            fill = path.get('fill')
+            style = path.get('style', '')
+
+            # Parse style attribute for stroke/fill
+            color = None
+            if 'stroke:' in style:
+                for part in style.split(';'):
+                    if 'stroke:' in part:
+                        color = part.split(':')[1].strip()
+            elif stroke:
+                color = stroke
+            elif fill and fill != 'none':
+                color = fill
+
+            pen = get_color_pen(color)
+            paths.append((d, pen))
 
     # Try without namespace if none found
     if not paths:
         for path in root.findall('.//path'):
             d = path.get('d')
             if d:
-                paths.append(d)
+                stroke = path.get('stroke')
+                fill = path.get('fill')
+                style = path.get('style', '')
+
+                color = None
+                if 'stroke:' in style:
+                    for part in style.split(';'):
+                        if 'stroke:' in part:
+                            color = part.split(':')[1].strip()
+                elif stroke:
+                    color = stroke
+                elif fill and fill != 'none':
+                    color = fill
+
+                pen = get_color_pen(color)
+                paths.append((d, pen))
 
     return paths
+
+def bezier_point(t, points):
+    """Calculate point on Bezier curve at parameter t (0 to 1)."""
+    n = len(points) - 1
+    x = y = 0
+    for i, (px, py) in enumerate(points):
+        # Binomial coefficient
+        binom = math.factorial(n) // (math.factorial(i) * math.factorial(n - i))
+        # Bernstein polynomial
+        bernstein = binom * (t ** i) * ((1 - t) ** (n - i))
+        x += bernstein * px
+        y += bernstein * py
+    return x, y
+
+def ellipse_point(cx, cy, rx, ry, angle, t):
+    """Calculate point on ellipse at parameter t (0 to 2π)."""
+    # Point on unrotated ellipse
+    x = rx * math.cos(t)
+    y = ry * math.sin(t)
+    # Rotate by angle
+    cos_a = math.cos(angle)
+    sin_a = math.sin(angle)
+    xr = x * cos_a - y * sin_a
+    yr = x * sin_a + y * cos_a
+    return cx + xr, cy + yr
+
+def svg_arc_to_center(x1, y1, x2, y2, rx, ry, phi, fa, fs):
+    """Convert SVG arc parameters to center parameterization."""
+    # Based on SVG spec: https://www.w3.org/TR/SVG/implnotes.html#ArcImplementationNotes
+    cos_phi = math.cos(phi)
+    sin_phi = math.sin(phi)
+
+    # Step 1: Compute center point
+    dx = (x1 - x2) / 2
+    dy = (y1 - y2) / 2
+    x1p = cos_phi * dx + sin_phi * dy
+    y1p = -sin_phi * dx + cos_phi * dy
+
+    # Correct radii if needed
+    lambda_ = (x1p / rx) ** 2 + (y1p / ry) ** 2
+    if lambda_ > 1:
+        rx *= math.sqrt(lambda_)
+        ry *= math.sqrt(lambda_)
+
+    # Step 2: Compute center
+    sign = -1 if fa == fs else 1
+    sq = max(0, (rx * ry) ** 2 - (rx * y1p) ** 2 - (ry * x1p) ** 2)
+    sq = sign * math.sqrt(sq / ((rx * y1p) ** 2 + (ry * x1p) ** 2))
+
+    cxp = sq * rx * y1p / ry
+    cyp = -sq * ry * x1p / rx
+
+    cx = cos_phi * cxp - sin_phi * cyp + (x1 + x2) / 2
+    cy = sin_phi * cxp + cos_phi * cyp + (y1 + y2) / 2
+
+    # Step 3: Compute angles
+    def angle_between(ux, uy, vx, vy):
+        dot = ux * vx + uy * vy
+        mod = math.sqrt((ux ** 2 + uy ** 2) * (vx ** 2 + vy ** 2))
+        rad = math.acos(dot / mod)
+        return rad if (ux * vy - uy * vx) >= 0 else -rad
+
+    theta1 = angle_between(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry)
+    dtheta = angle_between((x1p - cxp) / rx, (y1p - cyp) / ry,
+                          (-x1p - cxp) / rx, (-y1p - cyp) / ry)
+
+    if fs == 0 and dtheta > 0:
+        dtheta -= 2 * math.pi
+    elif fs == 1 and dtheta < 0:
+        dtheta += 2 * math.pi
+
+    return cx, cy, rx, ry, theta1, dtheta
 
 def parse_path_to_points(path_data, resolution=5.0):
     """
     Parse SVG path data into list of (x, y) points.
 
-    Simple parser that handles M (move) and L (line) commands.
-    Curves are approximated as lines.
+    Handles M, L, H, V, C, S, Q, T, A, Z commands (absolute and relative).
 
     Args:
         path_data: SVG path 'd' attribute string
@@ -73,7 +203,8 @@ def parse_path_to_points(path_data, resolution=5.0):
     """
     points = []
     current_x, current_y = 0, 0
-    subpath_start_x, subpath_start_y = 0, 0  # Track start of current subpath for Z command
+    subpath_start_x, subpath_start_y = 0, 0
+    last_control_x, last_control_y = None, None  # For S and T commands
 
     # Simple command parsing
     commands = path_data.replace(',', ' ').split()
@@ -85,65 +216,294 @@ def parse_path_to_points(path_data, resolution=5.0):
         if cmd == 'M':  # Move to (absolute)
             current_x = float(commands[i + 1])
             current_y = float(commands[i + 2])
-            subpath_start_x, subpath_start_y = current_x, current_y  # Remember start
-            points.append((current_x, current_y, False))  # Pen up
+            subpath_start_x, subpath_start_y = current_x, current_y
+            points.append((current_x, current_y, False))
+            last_control_x, last_control_y = None, None
             i += 3
 
         elif cmd == 'm':  # Move to (relative)
             current_x += float(commands[i + 1])
             current_y += float(commands[i + 2])
-            subpath_start_x, subpath_start_y = current_x, current_y  # Remember start
-            points.append((current_x, current_y, False))  # Pen up
+            subpath_start_x, subpath_start_y = current_x, current_y
+            points.append((current_x, current_y, False))
+            last_control_x, last_control_y = None, None
             i += 3
 
         elif cmd == 'L':  # Line to (absolute)
             current_x = float(commands[i + 1])
             current_y = float(commands[i + 2])
-            points.append((current_x, current_y, True))  # Pen down
+            points.append((current_x, current_y, True))
+            last_control_x, last_control_y = None, None
             i += 3
 
         elif cmd == 'l':  # Line to (relative)
             current_x += float(commands[i + 1])
             current_y += float(commands[i + 2])
-            points.append((current_x, current_y, True))  # Pen down
+            points.append((current_x, current_y, True))
+            last_control_x, last_control_y = None, None
             i += 3
 
         elif cmd == 'H':  # Horizontal line (absolute)
             current_x = float(commands[i + 1])
             points.append((current_x, current_y, True))
+            last_control_x, last_control_y = None, None
             i += 2
 
         elif cmd == 'h':  # Horizontal line (relative)
             current_x += float(commands[i + 1])
             points.append((current_x, current_y, True))
+            last_control_x, last_control_y = None, None
             i += 2
 
         elif cmd == 'V':  # Vertical line (absolute)
             current_y = float(commands[i + 1])
             points.append((current_x, current_y, True))
+            last_control_x, last_control_y = None, None
             i += 2
 
         elif cmd == 'v':  # Vertical line (relative)
             current_y += float(commands[i + 1])
             points.append((current_x, current_y, True))
+            last_control_x, last_control_y = None, None
             i += 2
 
+        elif cmd == 'C':  # Cubic Bezier (absolute)
+            x1, y1 = float(commands[i + 1]), float(commands[i + 2])
+            x2, y2 = float(commands[i + 3]), float(commands[i + 4])
+            x, y = float(commands[i + 5]), float(commands[i + 6])
+            # Sample curve
+            curve_points = [(current_x, current_y), (x1, y1), (x2, y2), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x2, y2
+            i += 7
+
+        elif cmd == 'c':  # Cubic Bezier (relative)
+            x1, y1 = current_x + float(commands[i + 1]), current_y + float(commands[i + 2])
+            x2, y2 = current_x + float(commands[i + 3]), current_y + float(commands[i + 4])
+            x, y = current_x + float(commands[i + 5]), current_y + float(commands[i + 6])
+            curve_points = [(current_x, current_y), (x1, y1), (x2, y2), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x2, y2
+            i += 7
+
+        elif cmd == 'S':  # Smooth cubic Bezier (absolute)
+            # First control point is reflection of last control point
+            if last_control_x is not None:
+                x1 = 2 * current_x - last_control_x
+                y1 = 2 * current_y - last_control_y
+            else:
+                x1, y1 = current_x, current_y
+            x2, y2 = float(commands[i + 1]), float(commands[i + 2])
+            x, y = float(commands[i + 3]), float(commands[i + 4])
+            curve_points = [(current_x, current_y), (x1, y1), (x2, y2), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x2, y2
+            i += 5
+
+        elif cmd == 's':  # Smooth cubic Bezier (relative)
+            if last_control_x is not None:
+                x1 = 2 * current_x - last_control_x
+                y1 = 2 * current_y - last_control_y
+            else:
+                x1, y1 = current_x, current_y
+            x2, y2 = current_x + float(commands[i + 1]), current_y + float(commands[i + 2])
+            x, y = current_x + float(commands[i + 3]), current_y + float(commands[i + 4])
+            curve_points = [(current_x, current_y), (x1, y1), (x2, y2), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x2, y2
+            i += 5
+
+        elif cmd == 'Q':  # Quadratic Bezier (absolute)
+            x1, y1 = float(commands[i + 1]), float(commands[i + 2])
+            x, y = float(commands[i + 3]), float(commands[i + 4])
+            curve_points = [(current_x, current_y), (x1, y1), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x1, y1
+            i += 5
+
+        elif cmd == 'q':  # Quadratic Bezier (relative)
+            x1, y1 = current_x + float(commands[i + 1]), current_y + float(commands[i + 2])
+            x, y = current_x + float(commands[i + 3]), current_y + float(commands[i + 4])
+            curve_points = [(current_x, current_y), (x1, y1), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x1, y1
+            i += 5
+
+        elif cmd == 'T':  # Smooth quadratic Bezier (absolute)
+            if last_control_x is not None:
+                x1 = 2 * current_x - last_control_x
+                y1 = 2 * current_y - last_control_y
+            else:
+                x1, y1 = current_x, current_y
+            x, y = float(commands[i + 1]), float(commands[i + 2])
+            curve_points = [(current_x, current_y), (x1, y1), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x1, y1
+            i += 3
+
+        elif cmd == 't':  # Smooth quadratic Bezier (relative)
+            if last_control_x is not None:
+                x1 = 2 * current_x - last_control_x
+                y1 = 2 * current_y - last_control_y
+            else:
+                x1, y1 = current_x, current_y
+            x, y = current_x + float(commands[i + 1]), current_y + float(commands[i + 2])
+            curve_points = [(current_x, current_y), (x1, y1), (x, y)]
+            steps = max(10, int(resolution))
+            for j in range(1, steps + 1):
+                t = j / steps
+                px, py = bezier_point(t, curve_points)
+                points.append((px, py, True))
+            current_x, current_y = x, y
+            last_control_x, last_control_y = x1, y1
+            i += 3
+
+        elif cmd == 'A':  # Arc (absolute)
+            rx, ry = float(commands[i + 1]), float(commands[i + 2])
+            x_axis_rot = float(commands[i + 3]) * math.pi / 180
+            large_arc = int(float(commands[i + 4]))
+            sweep = int(float(commands[i + 5]))
+            x, y = float(commands[i + 6]), float(commands[i + 7])
+
+            if rx == 0 or ry == 0:
+                # Degenerate to line
+                points.append((x, y, True))
+            else:
+                cx, cy, rx, ry, theta1, dtheta = svg_arc_to_center(
+                    current_x, current_y, x, y, rx, ry, x_axis_rot, large_arc, sweep
+                )
+                steps = max(10, int(abs(dtheta) * max(rx, ry) / resolution))
+                for j in range(1, steps + 1):
+                    t = theta1 + (j / steps) * dtheta
+                    px, py = ellipse_point(cx, cy, rx, ry, x_axis_rot, t)
+                    points.append((px, py, True))
+
+            current_x, current_y = x, y
+            last_control_x, last_control_y = None, None
+            i += 8
+
+        elif cmd == 'a':  # Arc (relative)
+            rx, ry = float(commands[i + 1]), float(commands[i + 2])
+            x_axis_rot = float(commands[i + 3]) * math.pi / 180
+            large_arc = int(float(commands[i + 4]))
+            sweep = int(float(commands[i + 5]))
+            x, y = current_x + float(commands[i + 6]), current_y + float(commands[i + 7])
+
+            if rx == 0 or ry == 0:
+                points.append((x, y, True))
+            else:
+                cx, cy, rx, ry, theta1, dtheta = svg_arc_to_center(
+                    current_x, current_y, x, y, rx, ry, x_axis_rot, large_arc, sweep
+                )
+                steps = max(10, int(abs(dtheta) * max(rx, ry) / resolution))
+                for j in range(1, steps + 1):
+                    t = theta1 + (j / steps) * dtheta
+                    px, py = ellipse_point(cx, cy, rx, ry, x_axis_rot, t)
+                    points.append((px, py, True))
+
+            current_x, current_y = x, y
+            last_control_x, last_control_y = None, None
+            i += 8
+
         elif cmd == 'Z' or cmd == 'z':  # Close path
-            # Draw line back to start of subpath
             if current_x != subpath_start_x or current_y != subpath_start_y:
                 points.append((subpath_start_x, subpath_start_y, True))
                 current_x = subpath_start_x
                 current_y = subpath_start_y
+            last_control_x, last_control_y = None, None
             i += 1
 
         else:
-            # Skip unsupported commands (C, Q, A, etc.)
+            # Skip unsupported commands
             i += 1
 
     return points
 
+def optimize_path_order(paths, anchor_distance, left_length, right_length):
+    """
+    Optimize order of paths to minimize travel distance.
+    Uses greedy nearest-neighbor algorithm.
+
+    Args:
+        paths: List of (path_data, pen_number) tuples
+        anchor_distance, left_length, right_length: Starting position
+
+    Returns:
+        Optimized list of (path_data, pen_number) tuples
+    """
+    if len(paths) <= 1:
+        return paths
+
+    # Get starting position
+    start_x, start_y = calculate_position(anchor_distance, left_length, right_length)
+
+    # Extract first point of each path
+    path_starts = []
+    for path_data, pen_num in paths:
+        points = parse_path_to_points(path_data)
+        if points:
+            path_starts.append((points[0][0], points[0][1], path_data, pen_num))
+
+    # Greedy nearest neighbor
+    optimized = []
+    remaining = path_starts[:]
+    current_x, current_y = start_x, start_y
+
+    while remaining:
+        # Find nearest path
+        min_dist = float('inf')
+        nearest_idx = 0
+
+        for i, (px, py, _, _) in enumerate(remaining):
+            dist = math.sqrt((px - current_x)**2 + (py - current_y)**2)
+            if dist < min_dist:
+                min_dist = dist
+                nearest_idx = i
+
+        # Add to optimized list
+        px, py, path_data, pen_num = remaining.pop(nearest_idx)
+        optimized.append((path_data, pen_num))
+        current_x, current_y = px, py
+
+    return optimized
+
 def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
-                 scale=1.0, offset_x=0.0, offset_y=0.0):
+                 scale=1.0, offset_x=0.0, offset_y=0.0, optimize=True):
     """
     Convert SVG to G-code.
 
@@ -158,6 +518,7 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
         scale: Scale factor (1.0 = 1:1)
         offset_x: X offset to add to all SVG points (mm)
         offset_y: Y offset to add to all SVG points (mm)
+        optimize: Whether to optimize path order (default: True)
 
     Returns:
         List of G-code lines
@@ -168,24 +529,50 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
     if not paths:
         raise ValueError(f"No paths found in {svg_file}")
 
+    # Optimize path order if requested
+    if optimize:
+        paths = optimize_path_order(paths, anchor_distance, left_length, right_length)
+
     # Calculate starting position (center of drawing)
     start_x, start_y = calculate_position(anchor_distance, left_length, right_length)
+
+    # Pen Z positions (tested and verified)
+    # Only pens 1-3 work reliably (pen 4 has mechanical issues)
+    PEN_Z_READY = {1: 172, 2: 244, 3: 316}
 
     gcode_lines = [
         "M17",  # Enable steppers
         "G77",  # Pen holder calibration
-        "G90",  # Absolute positioning for pen
-        "G1 Z89",  # Select pen 1, pen up position
-        "G91",  # Relative positioning for movement
+        "G90",  # Absolute mode
+        "G1 Z172",  # Select pen 1 ready position
+        "G91",  # Relative mode for movements
         "G1 F1000",  # Set feedrate
     ]
 
     current_L = left_length
     current_R = right_length
     pen_is_down = False
+    current_pen = 1
 
     # Process each path
-    for path_data in paths:
+    for path_data, pen_number in paths:
+        # Limit to pens 1-3 (pen 4 doesn't work)
+        if pen_number > 3:
+            pen_number = 3  # Fallback to pen 3
+
+        # Switch pen if needed
+        if pen_number != current_pen:
+            # Raise current pen if down
+            if pen_is_down:
+                gcode_lines.append("G1 Z100")  # Pen up
+                pen_is_down = False
+
+            # Select new pen (absolute positioning)
+            gcode_lines.append("G90")  # Absolute mode
+            gcode_lines.append(f"G1 Z{PEN_Z_READY[pen_number]}")  # Ready position
+            gcode_lines.append("G91")  # Back to relative mode
+            current_pen = pen_number
+
         points = parse_path_to_points(path_data)
 
         # Find SVG bounding box to center the drawing
@@ -200,14 +587,13 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
         for svg_x, svg_y, pen_down in points:
             # Handle pen up/down
             if pen_down and not pen_is_down:
-                # Lower pen
-                gcode_lines.append("G101")
+                # Lower pen (TWO-STAGE: G101 then G1 Z-100)
+                gcode_lines.append("G101")     # Stage 1: Initial contact
+                gcode_lines.append("G1 Z-100") # Stage 2: Full extension
                 pen_is_down = True
             elif not pen_down and pen_is_down:
-                # Raise pen
-                gcode_lines.append("G90")
-                gcode_lines.append("G1 Z89")
-                gcode_lines.append("G91")
+                # Raise pen (single command)
+                gcode_lines.append("G1 Z100")
                 pen_is_down = False
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
@@ -232,9 +618,7 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
 
     # Ensure pen is up before returning
     if pen_is_down:
-        gcode_lines.append("G90")
-        gcode_lines.append("G1 Z89")
-        gcode_lines.append("G91")
+        gcode_lines.append("G1 Z100")  # Pen up (relative)
         pen_is_down = False
 
     # Return to starting position
@@ -266,6 +650,8 @@ def main():
                         help='Y offset in mm (default: 0)')
     parser.add_argument('--output', '-o', type=str, default='gcode/svg_output.gcode',
                         help='Output file (default: gcode/svg_output.gcode)')
+    parser.add_argument('--no-optimize', action='store_true',
+                        help='Disable path optimization')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Suppress output')
 
@@ -292,7 +678,8 @@ def main():
             args.right_length,
             args.scale,
             args.offset_x,
-            args.offset_y
+            args.offset_y,
+            optimize=not args.no_optimize
         )
 
         if not args.quiet:
