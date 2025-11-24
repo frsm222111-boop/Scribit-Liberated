@@ -1,7 +1,7 @@
 # Scribit Pen Control
 
 ## Overview
-Scribit uses custom G-codes (G100, G101) and the Z axis for pen selection and control.
+Scribit uses custom G-codes (G77, G101) and the Z axis for pen selection and control.
 
 ## Pen Selection
 
@@ -17,82 +17,49 @@ The Z axis value selects which pen to use:
 ## Commands
 
 ### G77
-Pen holder calibration command. Should be called during initialization.
-
-### G100
-**Pen calibration command - REQUIRED for proper pen contact!**
-
-Automatically calibrates the exact distance needed to press the pen against the wall:
-1. Selects the current pen (based on Z value: 89, 161, 233, or 305)
-2. Lowers the pen holder by 30 units while monitoring IMU (gyroscope)
-3. Detects vibration when pen tip contacts wall
-4. Calculates and stores the exact drop distance for that specific pen
-5. Raises pen back up
-
-**IMPORTANT:** Run G100 for each pen before first use to ensure proper wall contact!
+Pen holder homing/calibration command. Must be called during initialization to home the cylinder.
 
 ### G101
-**Pen down** command.
+**Overshoot correction command - CRITICAL for proper pen positioning!**
 
-Lowers the currently selected pen by a configured amount (default 30 units).
+After selecting a pen using absolute Z positioning (G1 Z89/161/233/305), the pen holder may overshoot slightly. G101 corrects this overshoot to ensure the pen is properly centered.
 
-Implementation (from g101.h):
-```cpp
-mechanics.destination[Z_AXIS] = mechanics.destination[Z_AXIS] - g_timeLimit[l_selectedPen];
-```
-
-Default `g_timeLimit` = 30 for all pens.
-
-### Pen Up
-To raise the pen, set Z back to the pen selection value:
+**IMPORTANT:** Call G101 TWICE after selecting a pen for proper seating:
 ```gcode
-G90        ; Absolute positioning
-G1 Z89     ; Raise pen (for pen 1)
-G91        ; Back to relative positioning
+G90         ; Absolute mode
+G1 Z89      ; Select pen 1
+G101        ; First correction
+G101        ; Second correction (ensures proper centering)
 ```
+
+### Pen Up/Down in Relative Mode
+
+After initialization, use relative Z movements for pen control:
+
+**Pen Down:**
+```gcode
+G1 Z-30     ; Lower pen 30 units (in relative mode)
+```
+
+**Pen Up:**
+```gcode
+G1 Z30      ; Raise pen 30 units (in relative mode)
+```
+
+**IMPORTANT:** The Z±30 values are for relative mode (G91). DO NOT use Z±60 or Z±72 - those values do not work correctly.
 
 ## Complete Pen Control Sequence
 
-### Initialization (First Time Setup)
+### Initialization
 ```gcode
-M17        ; Enable steppers
-G77        ; Pen holder calibration
-
-; Calibrate pen 1
-G90        ; Absolute positioning
-G1 Z89     ; Select pen 1
-G100       ; AUTO-CALIBRATE pen 1 drop distance (uses IMU)
-
-; Calibrate pen 2 (if using multiple pens)
-G90
-G1 Z161    ; Select pen 2
-G100       ; Auto-calibrate pen 2
-
-; Calibrate pen 3
-G90
-G1 Z233    ; Select pen 3
-G100       ; Auto-calibrate pen 3
-
-; Calibrate pen 4
-G90
-G1 Z305    ; Select pen 4
-G100       ; Auto-calibrate pen 4
-
-; Return to pen 1 and prepare for drawing
-G90
-G1 Z89     ; Select pen 1, pen up
-G91        ; Relative positioning for X/Y movements
-G1 F1000   ; Set feedrate
-```
-
-### Initialization (After Calibration)
-```gcode
-M17        ; Enable steppers
-G77        ; Pen holder calibration
-G90        ; Absolute positioning
-G1 Z89     ; Select pen 1, pen up position
-G91        ; Relative positioning for X/Y movements
-G1 F1000   ; Set feedrate
+M17         ; Enable steppers
+G77         ; Home cylinder
+G90         ; Absolute positioning
+G1 Z89      ; Select pen 1 (or 161/233/305 for pens 2/3/4)
+G101        ; Correct overshoot (first call)
+G101        ; Correct overshoot (second call - critical!)
+G91         ; Switch to relative mode for drawing
+G1 F1000    ; Set feedrate
 ```
 
 ### Drawing Workflow
@@ -104,7 +71,7 @@ G1 X100 Y50    ; Move with pen up
 
 **Lower pen:**
 ```gcode
-G101           ; Pen down
+G1 Z-30        ; Pen down (relative)
 ```
 
 **Draw:**
@@ -115,9 +82,7 @@ G1 X150 Y200   ; Draw another line
 
 **Raise pen:**
 ```gcode
-G90            ; Switch to absolute
-G1 Z89         ; Raise pen
-G91            ; Back to relative
+G1 Z30         ; Pen up (relative)
 ```
 
 **Move to new position:**
@@ -127,51 +92,78 @@ G1 X-50 Y-100  ; Move to new location
 
 **Lower pen and continue:**
 ```gcode
-G101           ; Pen down
+G1 Z-30        ; Pen down
 G1 X100 Y0     ; Draw
+```
+
+### Switching Pens
+
+To switch to a different pen during drawing:
+
+```gcode
+G1 Z30         ; Raise current pen (if down)
+G90            ; Absolute mode
+G1 Z161        ; Select pen 2
+G101           ; Correct overshoot (first)
+G101           ; Correct overshoot (second)
+G91            ; Back to relative mode
+; Continue drawing with new pen
 ```
 
 ### Finish
 ```gcode
-G90            ; Absolute positioning
-G1 Z89         ; Ensure pen is up
+G1 Z30         ; Ensure pen is up (if down)
 M18            ; Disable steppers
 ```
 
 ## Important Notes
 
-1. **Run G100 calibration for each pen on first use!** This uses the IMU to detect wall contact and sets the correct drop distance
-2. **Always initialize with G77** before using pen commands
-3. **Select pen with Z value** before lowering (G90, G1 Z89)
-4. **Switch between G90/G91** when raising pen:
-   - Use G90 for pen up (Z absolute position)
-   - Use G91 for X/Y movements (relative deltas)
-5. **Default pen drop** is 30 units (before calibration). After G100, each pen has its own calibrated distance
-6. **Always raise pen before** moving to prevent dragging
-7. **G100 requires working IMU** - if IMU unavailable, falls back to 30-unit default
+1. **Always call G101 TWICE after selecting a pen** - the second call ensures proper centering
+2. **Always initialize with G77** to home the cylinder before using pen commands
+3. **Use Z±30 for pen up/down in relative mode** (NOT Z±60 or Z±72)
+4. **Select pen with absolute Z** (G90, G1 Z89/161/233/305) then correct with G101 twice
+5. **Stay in relative mode (G91) for drawing** - only switch to G90 when changing pens
+6. **Always raise pen before moving** to prevent dragging
 
-## Mode Switching Pattern
+## Mode Usage Pattern
 
-The firmware requires switching between absolute and relative modes:
+The correct pattern is:
 
 ```gcode
-G91            ; Relative for movements
+; Initialization (absolute mode)
+G90            ; Absolute
+G1 Z89         ; Select pen
+G101           ; Correct
+G101           ; Correct again
+
+; Drawing (relative mode)
+G91            ; Relative for everything
 G1 X50 Y50     ; Move (relative)
-G101           ; Pen down
+G1 Z-30        ; Pen down (relative)
 G1 X100 Y100   ; Draw (relative)
-G90            ; Switch to absolute
-G1 Z89         ; Pen up (absolute Z)
-G91            ; Back to relative
+G1 Z30         ; Pen up (relative)
 G1 X-50 Y-50   ; Move (relative)
+
+; Change pen (absolute mode)
+G90            ; Absolute
+G1 Z161        ; Select pen 2
+G101           ; Correct
+G101           ; Correct again
+G91            ; Back to relative
+
+; Continue drawing (relative mode)
+G1 Z-30        ; Pen down
 ```
 
-## Example: Draw Square
+## Example: Draw Square with Pen 1
 
 ```gcode
 M17            ; Enable steppers
-G77            ; Calibrate pen holder
+G77            ; Home cylinder
 G90            ; Absolute mode
-G1 Z89         ; Select pen 1, pen up
+G1 Z89         ; Select pen 1
+G101           ; Correct overshoot
+G101           ; Correct again
 G91            ; Relative mode
 G1 F1000       ; Set feedrate
 
@@ -179,29 +171,40 @@ G1 F1000       ; Set feedrate
 G1 X0 Y0       ; At start position
 
 ; Draw square
-G101           ; Pen down
+G1 Z-30        ; Pen down
 G1 X100 Y0     ; Right edge
 G1 X0 Y100     ; Down edge
 G1 X-100 Y0    ; Left edge
 G1 X0 Y-100    ; Up edge (close square)
 
 ; Finish
-G90            ; Absolute mode
-G1 Z89         ; Pen up
+G1 Z30         ; Pen up
 M18            ; Disable steppers
 ```
 
 ## Implementation Files
 
 Source code location:
-- `Firmware/MK4duo/src/core/commands/gcode/scribit/g100.h` - G100 implementation
-- `Firmware/MK4duo/src/core/commands/gcode/scribit/g101.h` - G101 implementation
+- `Firmware/MK4duo/src/core/commands/gcode/scribit/g77.h` - G77 (homing)
+- `Firmware/MK4duo/src/core/commands/gcode/scribit/g101.h` - G101 (overshoot correction)
+
+## Key Differences from Previous Method
+
+**CORRECTED (working):**
+- Call G101 TWICE after pen selection
+- Use Z±30 for pen up/down in relative mode
+- Stay in G91 (relative) for all drawing operations
+
+**INCORRECT (old method that didn't work):**
+- Called G101 only once
+- Used Z±60 or Z±72 for pen control
+- Switched between G90/G91 frequently
 
 ## Usage in Scripts
 
-All drawing scripts (square, circle, SVG) automatically handle:
-- Pen initialization (M17, G77, G90, G1 Z89)
-- Pen down when drawing (G101)
-- Pen up when moving (G90, G1 Z89, G91)
-- Pen up before return to start
-- Mode switching between G90/G91
+All drawing scripts (square, circle, SVG converter) automatically handle:
+- Pen initialization (M17, G77, G90, G1 Z89, G101, G101)
+- Pen down when drawing (G1 Z-30 in relative mode)
+- Pen up when moving (G1 Z30 in relative mode)
+- Proper pen switching with double G101
+- Staying in relative mode (G91) for all drawing

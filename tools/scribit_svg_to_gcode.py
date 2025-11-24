@@ -14,28 +14,29 @@ CRITICAL: G91 coordinate mapping requires negating the right string delta!
 - G-code X = left string delta
 - G-code Y = -right string delta (NEGATED!)
 
-PEN CONTROL (FINAL SIMPLE METHOD - VERIFIED ON HARDWARE):
+PEN CONTROL (CORRECTED METHOD - VERIFIED ON HARDWARE):
 Initialization (ONCE at start):
   M17          ; Enable steppers
   G77          ; Home cylinder
   G90          ; Absolute mode
   G1 Z89       ; Select pen 1 (or 161/233/305 for pens 2/3/4)
-  G101         ; Correct overshoot
+  G101         ; Correct overshoot (call twice for proper seating)
+  G101         ; Second correction ensures pen is centered
   G91          ; Relative mode
   G1 F1000     ; Set feedrate
 
-Pen Down (forward-back motion creates contact):
-  G1 Z72       ; Move forward
-  G1 Z-72      ; Move back = PEN DOWN!
+Pen Down:
+  G1 Z-30      ; Lower pen (in relative mode)
 
-Pen Up (from -72 position):
-  G1 Z72       ; Move forward = PEN UP!
+Pen Up:
+  G1 Z30       ; Raise pen (in relative mode)
 
 Pen Switching:
-  G1 Z72       ; Pen up if down
+  G1 Z30       ; Pen up if down
   G90          ; Absolute mode
   G1 Z[position]  ; Select new pen (89/161/233/305)
   G101         ; Correct overshoot
+  G101         ; Second correction
   G91          ; Relative mode
 
 Color to Pen Mapping:
@@ -567,14 +568,15 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
         "G77",   # Home cylinder (ONCE at start)
         "G90",   # Absolute mode
         "G1 Z89",  # Select pen 1
-        "G101",  # Correct overshoot
+        "G101",  # Correct overshoot (first call)
+        "G101",  # Correct overshoot (second call for proper seating)
         "G91",   # Relative mode for movements
         "G1 F1000",  # Set feedrate
     ]
 
     current_L = left_length
     current_R = right_length
-    pen_z_relative = 0  # Track relative Z position (0 = up, -72 = down)
+    pen_z_relative = 0  # Track relative Z position (0 = up, -30 = down)
     current_pen = 1
 
     # Process each path
@@ -585,15 +587,16 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
 
         # Switch pen if needed
         if pen_number != current_pen:
-            # Raise current pen if down (from -72 to 0)
-            if pen_z_relative == -72:
-                gcode_lines.append("G1 Z72")  # Pen up
+            # Raise current pen if down (from -30 to 0)
+            if pen_z_relative == -30:
+                gcode_lines.append("G1 Z30")  # Pen up
                 pen_z_relative = 0
 
             # Select new pen (absolute positioning)
             gcode_lines.append("G90")  # Absolute mode
             gcode_lines.append(f"G1 Z{PEN_Z_ABSOLUTE[pen_number]}")  # Select pen
-            gcode_lines.append("G101")  # Correct overshoot
+            gcode_lines.append("G101")  # Correct overshoot (first call)
+            gcode_lines.append("G101")  # Correct overshoot (second call)
             gcode_lines.append("G91")  # Back to relative mode
             current_pen = pen_number
 
@@ -609,15 +612,14 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             svg_center_y = (svg_min_y + svg_max_y) / 2
 
         for svg_x, svg_y, pen_down in points:
-            # Handle pen up/down (FINAL SIMPLE METHOD)
+            # Handle pen up/down (CORRECTED METHOD)
             if pen_down and pen_z_relative == 0:
-                # Lower pen (forward-back motion)
-                gcode_lines.append("G1 Z72")   # Forward
-                gcode_lines.append("G1 Z-72")  # Back = PEN DOWN!
-                pen_z_relative = -72
-            elif not pen_down and pen_z_relative == -72:
-                # Raise pen (forward motion from -72)
-                gcode_lines.append("G1 Z72")
+                # Lower pen
+                gcode_lines.append("G1 Z-30")  # PEN DOWN!
+                pen_z_relative = -30
+            elif not pen_down and pen_z_relative == -30:
+                # Raise pen
+                gcode_lines.append("G1 Z30")  # PEN UP!
                 pen_z_relative = 0
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
@@ -641,8 +643,8 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             current_R = target_R
 
     # Ensure pen is up before returning
-    if pen_z_relative == -72:
-        gcode_lines.append("G1 Z72")  # Pen up
+    if pen_z_relative == -30:
+        gcode_lines.append("G1 Z30")  # Pen up
         pen_z_relative = 0
 
     # Return to starting position
