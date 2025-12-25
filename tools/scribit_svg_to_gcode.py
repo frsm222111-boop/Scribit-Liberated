@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scribit SVG to G-code converter - Full-featured edition.
+Scribit SVG to G-code converter - Overshoot method edition.
 
 Features:
 - Complete SVG path support (M, L, H, V, C, S, Q, T, A, Z)
@@ -8,42 +8,40 @@ Features:
 - Path optimization (greedy nearest-neighbor)
 - Auto-centering and scaling
 - Proper G91 coordinate mapping with Y-negation
-- ALL 4 PENS WORKING with final simple method!
+- ALL 4 PENS WORKING with overshoot method!
 
 CRITICAL: G91 coordinate mapping requires negating the right string delta!
 - G-code X = left string delta
 - G-code Y = -right string delta (NEGATED!)
 
-PEN CONTROL (CORRECTED METHOD - VERIFIED ON HARDWARE):
-Initialization (ONCE at start):
-  M17          ; Enable steppers
-  G77          ; Home cylinder
-  G90          ; Absolute mode
-  G1 Z89       ; Select pen 1 (or 161/233/305 for pens 2/3/4)
-  G101         ; Correct overshoot (call twice for proper seating)
-  G101         ; Second correction ensures pen is centered
-  G91          ; Relative mode
-  G1 F1000     ; Set feedrate
+PEN CONTROL (OVERSHOOT METHOD - HARDWARE VERIFIED):
+ASSUMPTION: Script assumes cylinder is homed and at pen1 up position
+  (Run: G77, G90, G1 Z160, G91, G1 Z-70 before running generated gcode)
 
 Pen Down:
-  G1 Z-30      ; Lower pen (in relative mode)
+  G1 Z-30      ; Lower pen
 
 Pen Up:
-  G1 Z30       ; Raise pen (in relative mode)
+  G1 Z30       ; Raise pen
 
-Pen Switching:
+Pen Switching (to next pen 2,3,4):
   G1 Z30       ; Pen up if down
-  G90          ; Absolute mode
-  G1 Z[position]  ; Select new pen (89/161/233/305)
-  G101         ; Correct overshoot
-  G101         ; Second correction
-  G91          ; Relative mode
+  G1 Z72       ; Rotate to next pen
+  G1 Z60       ; Overshoot
+  G1 Z-60      ; Return to engage → next pen up
+
+Pen Switching (pen4 → pen1):
+  G1 Z30       ; Pen up if down
+  G1 Z72       ; First rotation
+  G1 Z72       ; Second rotation
+  G1 Z60       ; Overshoot
+  G1 Z-60      ; Return to engage → pen1 up
 
 Color to Pen Mapping:
-  Black (default) -> Pen 1 (Z89)
-  Red            -> Pen 2 (Z161)
-  Blue           -> Pen 3 (Z233)
-  Green          -> Pen 4 (Z305)
+  Black (default) -> Pen 1
+  Red            -> Pen 2
+  Blue           -> Pen 3
+  Green          -> Pen 4
 """
 
 import math
@@ -560,18 +558,11 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
     # Calculate starting position (center of drawing)
     start_x, start_y = calculate_position(anchor_distance, left_length, right_length)
 
-    # Pen Z positions (absolute) - ALL 4 PENS WORKING!
-    PEN_Z_ABSOLUTE = {1: 89, 2: 161, 3: 233, 4: 305}
-
+    # Assumes already homed and at pen1 up (G77, G90, Z160, G91, Z-70 done separately)
     gcode_lines = [
-        "M17",   # Enable steppers
-        "G77",   # Home cylinder (ONCE at start)
-        "G90",   # Absolute mode
-        "G1 Z89",  # Select pen 1
-        "G101",  # Correct overshoot (first call)
-        "G101",  # Correct overshoot (second call for proper seating)
-        "G91",   # Relative mode for movements
-        "G1 F1000",  # Set feedrate
+        "M17",      # Enable steppers
+        "G91",      # Ensure relative mode
+        "G1 F1000", # Set feedrate
     ]
 
     current_L = left_length
@@ -592,13 +583,26 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
                 gcode_lines.append("G1 Z30")  # Pen up
                 pen_z_relative = 0
 
-            # Select new pen (absolute positioning)
-            gcode_lines.append("G90")  # Absolute mode
-            gcode_lines.append(f"G1 Z{PEN_Z_ABSOLUTE[pen_number]}")  # Select pen
-            gcode_lines.append("G101")  # Correct overshoot (first call)
-            gcode_lines.append("G101")  # Correct overshoot (second call)
-            gcode_lines.append("G91")  # Back to relative mode
+            # Calculate pen distance (how many pens to move forward)
+            pen_distance = pen_number - current_pen
+
+            # Handle wrap-around: pen4 → pen1
+            if current_pen == 4 and pen_number == 1:
+                # Special case: double rotation for pen4 → pen1
+                gcode_lines.append("G1 Z72")   # First rotation
+                gcode_lines.append("G1 Z72")   # Second rotation
+                gcode_lines.append("G1 Z60")   # Overshoot
+                gcode_lines.append("G1 Z-60")  # Return to engage → pen1 up
+            else:
+                # Normal case: move to next pen(s)
+                # Each pen is 72° away, add 60° overshoot, return -60°
+                for _ in range(abs(pen_distance)):
+                    gcode_lines.append("G1 Z72")   # Rotate to next pen
+                gcode_lines.append("G1 Z60")       # Overshoot
+                gcode_lines.append("G1 Z-60")      # Return to engage → next pen up
+
             current_pen = pen_number
+            pen_z_relative = 0  # After switch, always at pen up
 
         points = parse_path_to_points(path_data)
 

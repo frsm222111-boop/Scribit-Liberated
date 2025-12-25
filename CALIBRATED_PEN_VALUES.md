@@ -1,112 +1,89 @@
-# ✅ CALIBRATED PEN POSITIONS - FINAL SIMPLE METHOD
+# ✅ CALIBRATED PEN POSITIONS - OVERSHOOT METHOD
 
-## Pen Positions (Absolute - ALL 4 PENS WORKING!)
+## Pen Mechanism Discovery
 
-| Pen | Color | Absolute Z | Formula |
-|-----|-------|------------|---------|
-| 1   | Black | **89**     | 89 + (0×72) |
-| 2   | Red   | **161**    | 89 + (1×72) |
-| 3   | Blue  | **233**    | 89 + (2×72) |
-| 4   | Green | **305**    | 89 + (3×72) |
+Pen cylinder requires **overshoot and return** to engage lowering mechanism:
+- Initial overshoot engages mechanism
+- Return to position completes engagement
+- Always start in **pen1 up** position after homing
 
-## Formula
-
-```python
-absolute_z = 89 + (pen_number - 1) × 72
-```
-
-Where `pen_number` is 1-4.
-
-## Complete Working Example
-
-**File:** `gcode/test-pens-absolute.gcode`
+## Initialization (ONCE at start)
 
 ```gcode
-M17
-G77
-
-; Pen 1
-G90
-G1 Z89
-G101
-
-G91
-G1 Z72
-G1 Z-72
-
-; Pen 2
-G90
-G1 Z161
-G101
-
-G91
-G1 Z72
-G1 Z-72
-
-; Pen 3
-G90
-G1 Z233
-G101
-
-G91
-G1 Z72
-G1 Z-72
-
-; Pen 4
-G90
-G1 Z305
-G101
-
-G91
-G1 Z72
-G1 Z-72
-
-M18
+M17          ; Enable steppers
+G77          ; Home pen cylinder
+G90          ; Absolute mode
+G1 Z160      ; Go to pen1 up with 100° overshoot
+G91          ; Relative mode
+G1 Z-70      ; Return 70° to engage mechanism → pen1 up
 ```
 
-## Why These Values?
+**Result:** Pen1 up position, ready to draw
 
-- **89** is the absolute position for pen 1
-- **72** is the spacing between each pen position
-- **G101** corrects overshoot after selecting pen
-- **G1 Z72** followed by **G1 Z-72** creates forward-back motion that extends pen to wall
-- All 4 pens verified working with this method!
+## Pen 1 Control
 
-## Pen Control Summary
-
+From pen1 up:
 ```gcode
-; Select pen (absolute mode)
-G90           ; Absolute mode
-G1 Z89        ; Pen 1 (or 161/233/305 for pens 2/3/4)
-G101          ; Correct overshoot
-
-; Switch to relative mode
-G91           ; Relative mode
-
-; Pen down (forward-back motion)
-G1 Z72        ; Move forward
-G1 Z-72       ; Move back = PEN DOWN!
-
-; ... drawing commands ...
-
-; Pen up (from -72 position)
-G1 Z72        ; Move forward = PEN UP!
+G1 Z-30      ; Pen down
+G1 Z30       ; Pen up
 ```
 
-## Files Updated
+## Moving to Next Pen (Pen 2, 3, or 4)
 
-✅ `tools/scribit_svg_to_gcode.py` - Updated to use 89/161/233/305 with Z72/-72 motion
-✅ `docs/PEN_CONTROL_FINAL_SIMPLE.md` - Complete documentation
-✅ `gcode/test-pens-absolute.gcode` - User-created test file (verified on hardware)
-✅ `gcode/star_final_simple.gcode` - SVG converter output with final method
-✅ `gcode/multicolor_final_simple.gcode` - Multi-color test with pen switching
+From any pen up position:
+```gcode
+G1 Z72       ; Rotate 72° to next pen position
+G1 Z60       ; Overshoot 60°
+G1 Z-60      ; Return 60° to engage → next pen up
+G1 Z-30      ; Pen down
+G1 Z30       ; Pen up
+```
+
+## Special Case: Pen 4 → Pen 1
+
+From pen4 up:
+```gcode
+G1 Z72       ; Rotate 72° (first step)
+G1 Z72       ; Rotate 72° (second step)
+G1 Z60       ; Overshoot 60°
+G1 Z-60      ; Return 60° to engage → pen1 up
+G1 Z-30      ; Pen down
+G1 Z30       ; Pen up
+```
+
+## Summary Table
+
+| Action | Command | Notes |
+|--------|---------|-------|
+| Home cylinder | G77 | Once at start |
+| To pen1 up (init) | G90, G1 Z160, G91, G1 Z-70 | 100° overshoot, return 70° |
+| Pen down | G1 Z-30 | From pen up |
+| Pen up | G1 Z30 | From pen down |
+| Next pen (2,3,4) | Z72, Z60, Z-60 | 72° rotation + 60° overshoot |
+| Pen4 → Pen1 | Z72, Z72, Z60, Z-60 | Double 72° rotation + overshoot |
+
+## Key Principles
+
+1. **Home once** - G77 only at initialization
+2. **Always start pen1 up** - Z160, Z-70 after homing
+3. **Overshoot required** - 100° for initial pen1, 60° for pen switches
+4. **Return engages mechanism** - Going back activates lowering
+5. **±30 for up/down** - Simple relative motion once engaged
+6. **72° between pens** - Pens spaced at 72° intervals
+7. **Pen4→Pen1 special** - Requires double 72° move
+
+## Test Files
+
+✅ `gcode/test-pens-home.gcode` - Home cylinder
+✅ `gcode/test-home-pen1-up-down-up.gcode` - Pen1 initialization and control
+✅ `gcode/test-pen-up-next-pen-up-down-up.gcode` - Move to next pen
+✅ `gcode/test-pen4-up-to-pen1-up.gcode` - Pen4 to pen1 transition
 
 ## Verification
 
-Run `gcode/test-pens-absolute.gcode` to verify each pen:
-1. Cylinder homes with G77 (ONCE at start)
-2. Each pen rotates to correct position (G90, Z position, G101)
-3. Forward-back motion (Z72, Z-72) extends pen to wall
-4. All 4 pens work correctly!
-
-This is the definitive, working method! ✅
+Run test files to verify:
+1. Cylinder homes with G77
+2. Initial overshoot (160°) and return (-70°) engages mechanism
+3. Pen down/up with ±30 works correctly
+4. Pen switching with 72° + 60° overshoot works
+5. Pen4 to pen1 with double 72° works

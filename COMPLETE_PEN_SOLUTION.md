@@ -1,164 +1,209 @@
-# ✅ COMPLETE PEN CONTROL SOLUTION - FINAL SIMPLE METHOD
+# ✅ COMPLETE PEN CONTROL SOLUTION - OVERSHOOT METHOD
 
 ## Discovery Summary
 
-After extensive firmware analysis and hardware testing, the **final simple method** has been verified working for all 4 pens.
+After hardware testing and experimentation, the **overshoot method** has been discovered and verified. This method uses mechanical overshoot and return to engage the pen lowering mechanism.
 
 ## The Evolution
 
-1. **Initial Discovery**: Z-axis controls both pen selection (rotation) and pen extension (translation)
-2. **First Method**: Base+100 positions with G1 Z-100 for pen down
-3. **Two-Stage Method**: G101 + G1 Z-100 for pen down (pens 1-3 worked, pen 4 stuck)
-4. **Final Simple Method**: G101 after selection + Z72/-72 motion for pen down (**ALL 4 PENS WORK!**)
+1. **Initial Discovery**: Z-axis controls pen selection (rotation) and pen extension (translation)
+2. **Absolute Position Method**: Used positions 89/161/233/305 with G101 and Z±72 motion
+3. **Overshoot Method**: Discovered that overshoot and return engages lowering mechanism - simpler and more reliable!
 
 ## The Solution
 
-### Pen Control Uses Z-Axis in TWO Modes:
+### Core Principle: Overshoot and Return
 
-1. **Absolute Mode (G90)**: Selects which pen by rotating cylinder to absolute position
-2. **Relative Mode (G91)**: Extends/retracts pen using forward-back motion
+The pen cylinder mechanism requires **overshoot followed by return** to engage:
+1. **Overshoot**: Move past target position
+2. **Return**: Move back to engage lowering mechanism
+3. **Control**: Use ±30 for pen down/up once engaged
 
-### Correct Pen Positions (Absolute)
+### Always Start at Pen1 Up
 
-| Pen | Color | Absolute Z | Spacing |
-|-----|-------|------------|---------|
-| 1   | Black | **89**     | Base    |
-| 2   | Red   | **161**    | +72     |
-| 3   | Blue  | **233**    | +72     |
-| 4   | Green | **305**    | +72     |
+After homing, always initialize to pen1 up position:
+- This provides a consistent starting state
+- Simplifies pen switching logic
+- Eliminates need for absolute position tracking
 
-### Correct Pen Commands
+## Complete Initialization Sequence
 
-**Pen Selection (absolute mode):**
 ```gcode
-G90         ; Absolute positioning
-G1 Z89      ; Select pen 1 (or 161/233/305 for pens 2/3/4)
-G101        ; Correct overshoot
-G91         ; Relative positioning
+M17          ; Enable steppers
+G77          ; Home pen cylinder (ONCE!)
+G90          ; Absolute positioning mode
+G1 Z160      ; Go to pen1 with 100° overshoot
+G91          ; Relative positioning mode
+G1 Z-70      ; Return 70° to engage mechanism → pen1 up
+G1 F1000     ; Set feedrate
 ```
 
-**Pen Down (relative mode, forward-back motion):**
+**Result:** Pen1 up, mechanism engaged, ready to draw
+
+## Pen 1 Control (Black)
+
+From pen1 up position:
+
+**Pen Down:**
 ```gcode
-G1 Z72      ; Move forward
-G1 Z-72     ; Move back = PEN DOWN!
+G1 Z-30      ; Move back 30° = PEN DOWN
 ```
 
-**Pen Up (relative mode, from -72 position):**
+**Pen Up:**
 ```gcode
-G1 Z72      ; Move forward = PEN UP!
+G1 Z30       ; Move forward 30° = PEN UP
 ```
+
+## Moving to Next Pen (2, 3, 4)
+
+From current pen up position to next pen:
+
+**Next Pen Sequence:**
+```gcode
+G1 Z72       ; Rotate 72° to next pen position
+G1 Z60       ; Overshoot 60°
+G1 Z-60      ; Return 60° to engage → next pen up
+```
+
+**Then control next pen:**
+```gcode
+G1 Z-30      ; Pen down
+G1 Z30       ; Pen up
+```
+
+### Example: Pen 1 → Pen 2
+
+```gcode
+; Assuming at pen1 up
+G1 Z72       ; Rotate to pen2
+G1 Z60       ; Overshoot
+G1 Z-60      ; Return → pen2 up
+G1 Z-30      ; Pen2 down
+; ... drawing ...
+G1 Z30       ; Pen2 up
+```
+
+## Special Case: Pen 4 → Pen 1
+
+Moving from pen4 back to pen1 requires **double 72° rotation**:
+
+```gcode
+; From pen4 up
+G1 Z72       ; First 72° rotation
+G1 Z72       ; Second 72° rotation (total 144°)
+G1 Z60       ; Overshoot 60°
+G1 Z-60      ; Return 60° to engage → pen1 up
+```
+
+**Why double rotation?**
+- Pens are at 72° intervals (360°/5 positions)
+- Pen4 is at position 3 (3×72° = 216° from home)
+- Pen1 is at position 0 (0° from home)
+- Forward path: 4→5→1 = 2×72° = 144°
+- Backward path would be 216° - not recommended
 
 ## Complete Working Example
 
 ### Test All 4 Pens
 
-File: `gcode/test-pens-absolute.gcode`
+File: `gcode/test-pens-complete.gcode`
 
 ```gcode
-M17         ; Enable steppers
-G77         ; Home pen cylinder (ONCE!)
+M17
+G77          ; Home cylinder
 
-; Pen 1 (Black)
-G90         ; Absolute mode
-G1 Z89      ; Select pen 1
-G101        ; Correct overshoot
-
-G91         ; Relative mode
-G1 Z72      ; Forward
-G1 Z-72     ; Back = PEN DOWN!
-
-; Pen 2 (Red)
+; Initialize to pen1 up
 G90
-G1 Z161     ; Select pen 2
-G101
-
+G1 Z160      ; 100° overshoot
 G91
-G1 Z72
-G1 Z-72
+G1 Z-70      ; Engage → pen1 up
 
-; Pen 3 (Blue)
-G90
-G1 Z233     ; Select pen 3
-G101
+G4 P1000     ; Pause
 
-G91
-G1 Z72
-G1 Z-72
+; Pen 1 down/up
+G1 Z-30      ; Pen1 down
+G4 P1000
+G1 Z30       ; Pen1 up
+G4 P1000
 
-; Pen 4 (Green) - NOW WORKS!
-G90
-G1 Z305     ; Select pen 4
-G101
+; Move to pen 2
+G1 Z72       ; Rotate to pen2
+G1 Z60       ; Overshoot
+G1 Z-60      ; Engage → pen2 up
+G4 P1000
 
-G91
-G1 Z72
-G1 Z-72
+; Pen 2 down/up
+G1 Z-30      ; Pen2 down
+G4 P1000
+G1 Z30       ; Pen2 up
+G4 P1000
 
-M18         ; Disable steppers
+; Move to pen 3
+G1 Z72       ; Rotate to pen3
+G1 Z60       ; Overshoot
+G1 Z-60      ; Engage → pen3 up
+G4 P1000
+
+; Pen 3 down/up
+G1 Z-30      ; Pen3 down
+G4 P1000
+G1 Z30       ; Pen3 up
+G4 P1000
+
+; Move to pen 4
+G1 Z72       ; Rotate to pen4
+G1 Z60       ; Overshoot
+G1 Z-60      ; Engage → pen4 up
+G4 P1000
+
+; Pen 4 down/up
+G1 Z-30      ; Pen4 down
+G4 P1000
+G1 Z30       ; Pen4 up
+G4 P1000
+
+; Return to pen 1
+G1 Z72       ; First rotation
+G1 Z72       ; Second rotation
+G1 Z60       ; Overshoot
+G1 Z-60      ; Engage → pen1 up
+G4 P1000
+
+M18
 ```
 
 ### Drawing Example
 
 ```gcode
 M17
-G77         ; Home cylinder ONCE at start
+G77          ; Home cylinder
+
+; Initialize to pen1 up
 G90
-G1 Z89      ; Select pen 1
-G101        ; Correct overshoot
+G1 Z160
 G91
+G1 Z-70
 G1 F1000
 
-; Draw square
-G1 X50 Y-50      ; Move to start (pen up)
-G1 Z72           ; Forward
-G1 Z-72          ; Back = pen down!
-G1 X100 Y0       ; Right edge
-G1 X0 Y100       ; Bottom edge
-G1 X-100 Y0      ; Left edge
-G1 X0 Y-100      ; Top edge
-G1 Z72           ; Pen up
+; Draw square with pen 1
+G1 X50 Y-50       ; Move to start (pen up)
+G1 Z-30           ; Pen down
+G1 X100 Y0        ; Right edge
+G1 X0 Y100        ; Bottom edge
+G1 X-100 Y0       ; Left edge
+G1 X0 Y-100       ; Top edge
+G1 Z30            ; Pen up
 
-; Move and draw with pen 2
-G90
-G1 Z161          ; Select pen 2
-G101
-G91
-G1 X150 Y-50     ; Move to new position
-G1 Z72           ; Forward
-G1 Z-72          ; Back = pen down!
-; ... drawing commands ...
-G1 Z72           ; Pen up
+; Switch to pen 2 and draw
+G1 Z72            ; Rotate to pen2
+G1 Z60            ; Overshoot
+G1 Z-60           ; Engage → pen2 up
 
-M18
-```
+G1 X150 Y-50      ; Move to new position
+G1 Z-30           ; Pen down
+G1 X50 Y0         ; Draw line
+G1 Z30            ; Pen up
 
-## Updated SVG Converter
-
-The SVG to G-code converter has been updated with final simple method:
-
-**Changes Made:**
-1. ✅ Initialization uses G77 (once), G90, Z89, G101, G91
-2. ✅ Pen down changed to `G1 Z72` followed by `G1 Z-72`
-3. ✅ Pen up changed to `G1 Z72` (from -72 position)
-4. ✅ Pen switching uses absolute positions (89/161/233/305) with G101
-5. ✅ All 4 pens now work (green maps to pen 4, not pen 3)
-6. ✅ Tracks relative Z position (0 = up, -72 = down)
-
-**Test Output:**
-```gcode
-M17
-G77
-G90
-G1 Z89       ; Pen 1
-G101         ; Correct overshoot
-G91
-G1 F1000
-G1 X-33.085 Y33.085    ; Move to start
-G1 Z72                 ; Forward
-G1 Z-72                ; Back = pen down! ✅
-G1 X36.985 Y-11.152    ; Draw
-...
-G1 Z72                 ; Pen up ✅
 M18
 ```
 
@@ -167,114 +212,160 @@ M18
 ### Z-Axis Mechanism
 
 The Z-axis stepper motor controls a cylinder that:
-1. **Rotates** to select one of 4 pens (4 rotational positions at 72° spacing)
-2. **Translates forward/backward** to extend/retract the selected pen
+1. **Rotates** to select one of 4 pens (72° spacing)
+2. **Translates** forward/backward to extend/retract selected pen
 
-### Why Forward-Back Motion Works
+### Why Overshoot Works
 
-The **G1 Z72** followed immediately by **G1 Z-72** creates a mechanical action:
-1. Z72 moves cylinder forward, positioning pen near wall
-2. Z-72 moves cylinder back while pen tip contacts wall
-3. The forward-back motion ensures proper pen extension and wall contact
-4. This elegant solution works for all 4 pens!
+The overshoot-and-return motion mechanically engages the lowering system:
+1. **Overshoot** positions the cylinder past the target
+2. **Return** activates internal mechanism that enables pen lowering
+3. **±30 motion** then controls pen up/down
 
-### Why G101 is Needed
-
-- **G101** makes a small calibration move after pen selection (~30 units)
-- It corrects for overshoot when rotating to absolute position
-- Must be called in relative mode after G90 pen selection
-- Critical for accurate pen positioning
+This is more elegant than absolute positioning because:
+- No need to track absolute positions
+- No need for G101 correction commands
+- Simpler state management
+- More mechanically reliable
 
 ### Relative Z Position Tracking
 
-When drawing, track the relative Z position:
-- **At pen selection**: Z position = 0 (relative)
-- **After pen down** (Z72, Z-72): Z position = -72 (relative)
-- **After pen up** (Z72): Z position = 0 (relative)
+Track relative Z position during drawing:
+- **After init** (pen1 up): Z position = 0
+- **After pen down**: Z position = -30
+- **After pen up**: Z position = 0
+- **After pen switch**: Z position = 0 (always at new pen up)
+
+## Pen Switching State Machine
+
+```
+START: Home (G77)
+  ↓
+Pen1 Up (Z160, Z-70)
+  ↓
+┌─────────────────┐
+│  Current Pen Up │ ← Entry point for all pens
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │  Z-30   │ Pen Down
+    └────┬────┘
+         │
+    ┌────┴────┐
+    │  Z+30   │ Pen Up
+    └────┬────┘
+         │
+    ┌────┴────┐
+    │ Switch? │
+    └────┬────┘
+         │
+    Yes  │  No (continue drawing)
+         ↓
+┌────────────────┐
+│ Next Pen?      │
+├────────────────┤
+│ Pen 2,3,4:     │
+│  Z72, Z60, Z-60│
+│ Pen 4→1:       │
+│  Z72, Z72,     │
+│  Z60, Z-60     │
+└────────┬───────┘
+         │
+         └──→ Back to "Current Pen Up"
+```
 
 ## Key Principles
 
-1. **G77 ONCE** - Home cylinder at start only (not between pen changes)
-2. **G90 for selection** - Use absolute mode to select pen position
-3. **G101 after selection** - Always correct overshoot after rotating
-4. **G91 for drawing** - Use relative mode for all X/Y movement and pen up/down
-5. **Z72, Z-72 for down** - Forward-back motion extends pen
-6. **Z72 for up** - Single forward motion retracts pen (from -72 position)
-7. **All 4 pens work** - No mechanical issues with this method!
+1. **G77 ONCE** - Home cylinder only at initialization
+2. **Always start pen1 up** - Consistent initial state
+3. **Overshoot required** - 100° for init, 60° for switches
+4. **Return engages** - Moving back activates lowering mechanism
+5. **±30 for control** - Simple up/down once engaged
+6. **72° between pens** - Consistent pen spacing
+7. **Pen4→Pen1 special** - Double 72° rotation forward
+8. **All relative mode** - No absolute positioning needed after init
 
-## What Each Command Does
+## Command Reference
 
-- **M17**: Enable stepper motors
-- **G77**: Home pen holder cylinder to zero position (call once!)
-- **G90**: Switch to absolute positioning mode
-- **G1 Z[89/161/233/305]**: Rotate cylinder to pen position
-- **G101**: Make small correction for overshoot (~30 units)
-- **G91**: Switch to relative positioning mode
-- **G1 Z72**: Move cylinder forward
-- **G1 Z-72**: Move cylinder back (creates pen contact when after Z72)
-- **M18**: Disable stepper motors
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| M17 | Enable steppers | Start of program |
+| G77 | Home cylinder | Once at initialization |
+| G90 | Absolute mode | Only for initial Z160 |
+| G1 Z160 | Go to pen1 with overshoot | Initialization only |
+| G91 | Relative mode | After Z160, stay in this mode |
+| G1 Z-70 | Engage pen1 | After Z160 overshoot |
+| G1 Z-30 | Pen down | When pen is up |
+| G1 Z30 | Pen up | When pen is down |
+| G1 Z72 | Rotate to next pen | Pen switching |
+| G1 Z60 | Overshoot for switch | After Z72 rotation |
+| G1 Z-60 | Engage after switch | After overshoot |
+| M18 | Disable steppers | End of program |
 
 ## Files Updated
 
-- ✅ `docs/PEN_CONTROL_FINAL_SIMPLE.md` - Complete technical documentation
-- ✅ `CALIBRATED_PEN_VALUES.md` - Updated with absolute positions
-- ✅ `gcode/test-pens-absolute.gcode` - Working test for all 4 pens (user-created)
-- ✅ `tools/scribit_svg_to_gcode.py` - Updated with final simple method
-- ✅ `gcode/star_final_simple.gcode` - SVG converter test output
-- ✅ `gcode/multicolor_final_simple.gcode` - Multi-color test with pen switching
+✅ `CALIBRATED_PEN_VALUES.md` - Updated with overshoot method
+✅ `COMPLETE_PEN_SOLUTION.md` - This file
+✅ `gcode/test-pens-home.gcode` - Home test
+✅ `gcode/test-home-pen1-up-down-up.gcode` - Pen1 initialization test
+✅ `gcode/test-pen-up-next-pen-up-down-up.gcode` - Pen switching test
+✅ `gcode/test-pen4-up-to-pen1-up.gcode` - Pen4→Pen1 test
 
 ## Verification
 
-Run `gcode/test-pens-absolute.gcode` to verify:
-1. Cylinder homes with G77
-2. Each pen rotates to correct position (with G101 correction)
-3. Forward motion (Z72) positions pen
-4. Back motion (Z-72) extends pen to wall - you should see/hear contact
-5. Forward motion (Z72) retracts pen from wall
-6. **All 4 pens work correctly!**
-
-## Advantages of This Method
-
-1. ✅ **Simple** - Easy to understand and implement
-2. ✅ **Reliable** - All 4 pens verified working
-3. ✅ **Consistent** - Same pattern for all pens
-4. ✅ **Elegant** - Uses natural forward-back mechanical motion
-5. ✅ **G77 once** - No need to rehome during drawing
-6. ✅ **Hardware verified** - Tested on actual Scribit device
+Run test files to verify:
+1. **Home**: Cylinder homes to reference position
+2. **Init**: Z160, Z-70 engages pen1 up correctly
+3. **Pen control**: Z±30 moves pen down/up
+4. **Pen switch**: Z72, Z60, Z-60 switches to next pen
+5. **Wrap around**: Z72, Z72, Z60, Z-60 returns pen4→pen1
+6. **Smooth operation**: No grinding, clean movements
 
 ## Common Issues & Solutions
 
-**Pen doesn't touch wall:**
-- ✅ Ensure using absolute positions (89/161/233/305, not old 172/244/316)
-- ✅ Ensure calling G101 after pen selection
-- ✅ Ensure using Z72 then Z-72 (both commands required)
+**Pen doesn't engage:**
+- ✅ Ensure using Z160, Z-70 for initialization
+- ✅ Ensure using Z60 overshoot for pen switches
+- ✅ Ensure returning same amount (-60) after overshoot
 
-**Pen doesn't lift:**
-- ✅ Ensure in G91 mode
-- ✅ Ensure using single `G1 Z72` (not Z100)
-- ✅ Ensure you previously did Z72, Z-72 (can't go up if not down)
+**Pen won't go down:**
+- ✅ Verify pen is in up position (Z=0 relative)
+- ✅ Use Z-30 to lower
+- ✅ Ensure mechanism was engaged (overshoot/return done)
+
+**Pen won't go up:**
+- ✅ Verify pen is in down position (Z=-30 relative)
+- ✅ Use Z+30 to raise
+- ✅ Don't use Z+30 when already up (no-op or error)
 
 **Wrong pen selected:**
-- ✅ Use G90 before selecting pen
-- ✅ Use absolute position values (89/161/233/305)
-- ✅ Call G77 at initialization
-- ✅ Call G101 immediately after pen selection
+- ✅ Count rotations: each Z72 moves to next pen
+- ✅ Use double Z72 for pen4→pen1
+- ✅ Track current pen state in code
 
-**Pen 4 gets stuck:**
-- ✅ Use final simple method (not old two-stage method)
-- ✅ Ensure using Z72/-72 motion (not G101 + Z-100)
-- ✅ Pen 4 works perfectly with this method!
+**Pen 4 → Pen 1 fails:**
+- ✅ Must use Z72, Z72 (not single Z144)
+- ✅ Add overshoot Z60, return Z-60 after rotations
 
 ## Success Criteria
 
-When `gcode/test-pens-absolute.gcode` runs correctly, you should observe:
+When test files run correctly, you should observe:
+1. **Clean rotation** - Smooth 72° movements
+2. **Overshoot motion** - Visible Z60 overshoot
+3. **Return engagement** - Audible/visible engagement on Z-60
+4. **Pen extension** - Pen touches wall on Z-30
+5. **Pen retraction** - Pen lifts on Z+30
+6. **Reliable switching** - Consistent pen changes
+7. **No errors** - Smooth operation throughout
 
-1. **Cylinder rotation** - Visible rotation to 4 different positions
-2. **G101 correction** - Small adjustment after each rotation
-3. **Forward motion** - Cylinder moves toward wall on Z72
-4. **Wall contact** - Pen tip touches wall on Z-72 (visual or audible feedback)
-5. **Pen retraction** - Cylinder moves away from wall on Z72
-6. **Smooth operation** - No grinding, stuttering, or errors
-7. **All 4 pens work** - Including pen 4 (green)!
+This confirms the overshoot method is working! 🎉
 
-This confirms the final simple method is working perfectly! 🎉
+## Advantages of Overshoot Method
+
+1. ✅ **Simpler** - No absolute position tracking needed
+2. ✅ **Reliable** - Mechanical engagement is robust
+3. ✅ **Consistent** - Same pattern for all pen switches
+4. ✅ **Elegant** - Uses natural mechanical motion
+5. ✅ **Stateless** - Always returns to "pen up" state
+6. ✅ **Hardware verified** - Tested on actual Scribit
+7. ✅ **Easy to implement** - Clear state machine
