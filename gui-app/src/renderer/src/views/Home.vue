@@ -1,32 +1,51 @@
 <template>
   <div class="home">
-    <h2>Welcome to Scribit Control</h2>
-    <p>Upload firmware, send G-code, and convert SVG files to control your Scribit device.</p>
+    <div class="card welcome-card">
+      <h1>Welcome to Scribit Control</h1>
+      <p class="subtitle">Manage your Scribit device firmware and operations</p>
 
-    <div class="features">
-      <div class="feature-card">
-        <h3>📦 Firmware Upload</h3>
-        <p>Upload firmware to your Scribit device via OTA</p>
-        <button disabled>Coming Soon</button>
+      <div v-if="!setupComplete" class="setup-required">
+        <h3>⚠️ Initial Setup Required</h3>
+        <p>Please complete firmware upload first to unlock all features</p>
+        <router-link to="/firmware" class="btn btn-primary">Go to Firmware Upload</router-link>
       </div>
 
-      <div class="feature-card">
-        <h3>📝 G-code Sender</h3>
-        <p>Send G-code commands to your Scribit device</p>
-        <button disabled>Coming Soon</button>
-      </div>
+      <div class="features">
+        <div class="feature-card">
+          <h2>Firmware Upload</h2>
+          <p>Update your Scribit device firmware over WiFi</p>
+          <router-link to="/firmware" class="btn btn-primary">Go to Firmware Upload</router-link>
+        </div>
 
-      <div class="feature-card">
-        <h3>🎨 SVG Converter</h3>
-        <p>Convert SVG files to G-code for drawing</p>
-        <button disabled>Coming Soon</button>
+        <div class="feature-card" :class="{ disabled: !setupComplete }">
+          <h2>G-code Sender</h2>
+          <p>Send G-code files to your device</p>
+          <button class="btn btn-primary" :disabled="!setupComplete">
+            {{ setupComplete ? 'Coming Soon' : 'Complete Setup First' }}
+          </button>
+        </div>
+
+        <div class="feature-card" :class="{ disabled: !setupComplete }">
+          <h2>SVG Converter</h2>
+          <p>Convert SVG files to G-code</p>
+          <button class="btn btn-primary" :disabled="!setupComplete">
+            {{ setupComplete ? 'Coming Soon' : 'Complete Setup First' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-// Home view component
+import { ref, onMounted } from 'vue'
+import { isSetupComplete } from '../utils/appState'
+
+const setupComplete = ref(false)
+
+onMounted(() => {
+  setupComplete.value = isSetupComplete()
+})
 </script>
 
 <style scoped>
@@ -35,66 +54,78 @@
   margin: 0 auto;
 }
 
-h2 {
-  font-size: 2rem;
-  margin-bottom: 1rem;
-  color: #2c3e50;
+.welcome-card {
+  text-align: center;
 }
 
-p {
-  font-size: 1.1rem;
-  color: #666;
+.welcome-card h1 {
+  font-size: 2.5rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  color: #7f8c8d;
+  margin-bottom: 3rem;
+}
+
+.setup-required {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  padding: 2rem;
   margin-bottom: 2rem;
+}
+
+.setup-required h3 {
+  color: #856404;
+  margin-bottom: 1rem;
+}
+
+.setup-required p {
+  color: #856404;
+  margin-bottom: 1.5rem;
 }
 
 .features {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 2rem;
-  margin-top: 3rem;
+  margin-top: 2rem;
 }
 
 .feature-card {
-  background: white;
   padding: 2rem;
+  border: 1px solid #ecf0f1;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: transform 0.2s;
+  background: #f8f9fa;
+  transition: all 0.3s;
 }
 
-.feature-card:hover {
+.feature-card:not(.disabled):hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.feature-card h3 {
+.feature-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.feature-card h2 {
   font-size: 1.5rem;
-  margin-bottom: 0.5rem;
   color: #2c3e50;
+  margin-bottom: 1rem;
 }
 
 .feature-card p {
-  font-size: 1rem;
+  color: #7f8c8d;
   margin-bottom: 1.5rem;
+  line-height: 1.6;
 }
 
-.feature-card button {
-  background: #3498db;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background 0.2s;
-}
-
-.feature-card button:hover:not(:disabled) {
-  background: #2980b9;
-}
-
-.feature-card button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+.feature-card .btn {
+  width: 100%;
 }
 </style>

@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import App from './App.vue'
+import { isSetupComplete } from './utils/appState'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -8,7 +9,8 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: () => import('./views/Home.vue')
+      component: () => import('./views/Home.vue'),
+      meta: { requiresSetup: true }
     },
     {
       path: '/firmware',
@@ -16,6 +18,15 @@ const router = createRouter({
       component: () => import('./views/FirmwareUpload.vue')
     }
   ]
+})
+
+// Navigation guard: redirect to firmware if setup not complete
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresSetup && !isSetupComplete()) {
+    next('/firmware')
+  } else {
+    next()
+  }
 })
 
 const app = createApp(App)

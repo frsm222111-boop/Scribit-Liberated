@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFile: (options) => ipcRenderer.invoke('select-file', options),
 
   // Network operations
-  sendWifiCredentials: (credentials) => ipcRenderer.invoke('send-wifi-credentials', credentials)
+  sendWifiCredentials: (credentials) => ipcRenderer.invoke('send-wifi-credentials', credentials),
+  checkDeviceConnection: () => ipcRenderer.invoke('check-device-connection')
 })

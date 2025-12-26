@@ -7,6 +7,20 @@ const axios = require('axios')
  * Register all IPC handlers
  */
 function registerIpcHandlers() {
+  // Check if device is reachable at 192.168.240.1:8888
+  // Any HTTP response (including 404) means we're connected
+  ipcMain.handle('check-device-connection', async () => {
+    try {
+      await axios.get('http://192.168.240.1:8888/', {
+        timeout: 2000,
+        validateStatus: () => true // Accept any HTTP status code
+      })
+      return { success: true, connected: true }
+    } catch (error) {
+      // Network error (timeout, connection refused, etc.)
+      return { success: true, connected: false }
+    }
+  })
   // Firmware upload handler
   ipcMain.handle('upload-firmware', async (event, options) => {
     try {
