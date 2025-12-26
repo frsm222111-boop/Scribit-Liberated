@@ -44,7 +44,10 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": ["dmg"],
-      "icon": "resources/icon.icns"
+      "icon": "resources/icon.icns",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "win": {
       "target": ["nsis"],
