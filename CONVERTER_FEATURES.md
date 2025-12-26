@@ -103,19 +103,35 @@ gcode = f"G1 X{left_delta} Y{-right_delta}"  # Y negated!
 ### ✅ 7. Pen Control
 
 **Full Pen Lifecycle:**
+
+To home the pen cylinder:
+
 ```gcode
 M17            # Enable steppers
 G77            # Calibrate pen holder
-G90            # Absolute mode
-G1 Z89         # Select pen, pen up
-G91            # Relative mode
-G1 F1000       # Set feedrate
+M18 
+```
+
+To start with pen 1 in up position after homing:
+
+```gcode
+; in absolute mode go to 160 to overshoort pen 1
+G90
+G1 Z160
+
+; pause 1 second
+G4 P1000
+
+; in relative mode go back 70 to engage the lowering mechanism and get to pen1 up 
+G91
+G1 Z-70
+```
 
 # During drawing:
-G101           # Pen down
-G90            # Absolute for pen up
-G1 Z89         # Raise pen
-G91            # Back to relative
+G91            # Relative mode
+G1 Z-30        # Pen down
+G1 Z-30        # Raise pen
+
 
 # At end:
 M18            # Disable steppers
@@ -240,7 +256,6 @@ python3 tools/scribit_svg_to_gcode.py INPUT.svg \
 
 - SVG transform support (matrix, rotate, scale)
 - Text-to-path conversion
-- Gradient color mapping
 - TSP-based optimization (vs greedy)
 - Preview/simulation mode
 - Progress callbacks
