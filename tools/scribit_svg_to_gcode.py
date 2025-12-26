@@ -627,8 +627,9 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
                 pen_z_relative = 0
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
-            relative_x = (svg_x - svg_center_x) * scale
-            relative_y = (svg_y - svg_center_y) * scale
+            # Calibrated compensation: 28mm/50mm measured → 0.893x, 40mm/50mm → 1.25x
+            relative_x = (svg_x - svg_center_x) * scale * 0.893
+            relative_y = (svg_y - svg_center_y) * scale * 1.25
 
             # Calculate absolute position on wall
             target_x = start_x + relative_x + offset_x
