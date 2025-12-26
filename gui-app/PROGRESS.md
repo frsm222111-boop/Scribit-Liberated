@@ -24,16 +24,17 @@
 - [x] Create `src/main/espota-runner.js`
 - [x] Test Python execution - Will test in Phase 4 UI
 
-## Phase 4: Firmware Upload Feature
-- [ ] Create `FirmwareUpload.vue`
-- [ ] Create `WifiPrompt.vue`
-- [ ] Create `ProgressBar.vue`
-- [ ] Implement Step 1: "Connect to ScribIt-XXXXXX"
-- [ ] Implement Step 2: WiFi form → POST 192.168.240.1:8888
-- [ ] Implement Step 3: "Connect to MBC-WB-XXXXXX"
-- [ ] Implement Step 4: espota.py uploads .bin files
-- [ ] HTTP client + error handling
-- [ ] LED status guide
+## Phase 4: Firmware Upload Feature ✅
+- [x] Create `FirmwareUpload.vue`
+- [x] Create `WifiPrompt.vue`
+- [x] Create `ProgressBar.vue`
+- [x] Implement Step 1: "Connect to ScribIt-XXXXXX"
+- [x] Implement Step 2: WiFi form → POST 192.168.240.1:8888
+- [x] Implement Step 3: "Connect to MBC-WB-XXXXXX"
+- [x] Implement Step 4: espota.py uploads .bin files
+- [x] HTTP client + error handling
+- [x] LED status guide
+- [ ] Test with real device (pending hardware)
 
 ## Phase 5: G-code Features
 - [ ] Create `GcodeSender.vue`

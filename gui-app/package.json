@@ -11,7 +11,12 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
-  "keywords": ["scribit", "firmware", "gcode", "electron"],
+  "keywords": [
+    "scribit",
+    "firmware",
+    "gcode",
+    "electron"
+  ],
   "author": "",
   "license": "ISC",
   "repository": {
@@ -26,6 +31,7 @@
     "vite": "^7.3.0"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
   },
@@ -43,14 +49,18 @@
     ],
     "mac": {
       "category": "public.app-category.utilities",
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "resources/icon.icns",
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "resources/icon.ico"
     },
     "extraResources": [
