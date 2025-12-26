@@ -47,7 +47,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ProgressBar from '../components/ProgressBar.vue'
 import WifiPrompt from '../components/WifiPrompt.vue'
-import { markSetupComplete } from '../utils/appState'
+import { markSetupComplete, setDeviceId } from '../utils/appState'
 
 const router = useRouter()
 const currentStep = ref(0)
@@ -139,7 +139,14 @@ async function sendWifi(creds) {
   const result = await window.electronAPI.sendWifiCredentials(creds)
 
   if (result.success) {
-    status.value = 'Success! Device entering OTA mode. Please connect to MBC-WB network.'
+    // Check for device ID in response: {"ID":"device_id"}
+    if (result.data && result.data.ID) {
+      setDeviceId(result.data.ID)
+      status.value = `Success! Device ID: ${result.data.ID}. Please connect to MBC-WB network.`
+    } else {
+      status.value = 'Success! Device entering OTA mode. Please connect to MBC-WB network.'
+    }
+
     setTimeout(() => {
       currentStep.value = 2
       status.value = ''

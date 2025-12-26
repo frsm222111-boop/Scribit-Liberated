@@ -6,8 +6,27 @@ export function isSetupComplete() {
   return state ? JSON.parse(state).setupComplete : false
 }
 
+export function getDeviceId() {
+  const state = localStorage.getItem(STORAGE_KEY)
+  return state ? JSON.parse(state).deviceId : null
+}
+
+export function setDeviceId(deviceId) {
+  const state = localStorage.getItem(STORAGE_KEY)
+  const currentState = state ? JSON.parse(state) : {}
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...currentState,
+    deviceId
+  }))
+}
+
 export function markSetupComplete() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ setupComplete: true }))
+  const state = localStorage.getItem(STORAGE_KEY)
+  const currentState = state ? JSON.parse(state) : {}
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...currentState,
+    setupComplete: true
+  }))
 }
 
 export function resetSetup() {
