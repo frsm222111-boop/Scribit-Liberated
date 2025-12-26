@@ -4,8 +4,13 @@
 - **[LOCAL_MODE_SETUP.md](LOCAL_MODE_SETUP.md)** - Step-by-step guide for non-technical users
 
 **🔍 Developer documentation:**
-- **[FIRMWARE_ANALYSIS.md](FIRMWARE_ANALYSIS.md)** - Complete analysis of what's included, what works, and what's missing
 - **[PROGRESS_TRACKER.md](PROGRESS_TRACKER.md)** - Implementation progress, multi-phase plan, and session notes
+
+## 📚 Documentation
+
+- **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user guide: SVG to G-code, WiFi connection, uploading, device control
+- **[GCODE_REFERENCE.md](GCODE_REFERENCE.md)** - G-code commands, coordinate system, pen control reference
+- **[FIRMWARE.md](FIRMWARE.md)** - Building and deploying firmware
 
 **Summary**: The firmware is complete and functional. It was designed for cloud operation but can be modified to work locally. See the analysis document for full details.
 
