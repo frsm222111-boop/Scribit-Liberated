@@ -19,7 +19,10 @@
         </div>
 
         <!-- Step 1: WiFi credentials -->
-        <WifiPrompt v-if="idx === 1 && currentStep === 1" @submit="sendWifi" />
+        <div v-if="idx === 1 && currentStep === 1">
+          <WifiPrompt @submit="sendWifi" />
+          <button class="btn btn-secondary" @click="skipStep2" style="margin-top: 1rem;">Skip (Debug)</button>
+        </div>
         <div v-if="idx === 1 && status" class="verification-status info">{{ status }}</div>
 
         <!-- Step 2: Verify MBC-WB network -->
@@ -132,6 +135,14 @@ function nextStep() {
   if (currentStep.value < 3) {
     currentStep.value++
   }
+}
+
+function skipStep2() {
+  status.value = 'Skipped WiFi credentials (debug mode)'
+  setTimeout(() => {
+    currentStep.value = 2
+    status.value = ''
+  }, 1000)
 }
 
 async function sendWifi(creds) {
