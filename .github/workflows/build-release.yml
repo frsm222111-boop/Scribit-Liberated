@@ -1,0 +1,132 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-firmware:
+    name: Build Firmware
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup configuration files
+        run: |
+          cp ExtraFile/SIConfig.hpp.example Firmware/ScribitESP/SIConfig.hpp
+          cp ExtraFile/Mk4duoVersion.h.example Firmware/MK4duo/Mk4duoVersion.h
+          cp ExtraFile/ScribitVersion.hpp.example Firmware/ScribitESP/ScribitVersion.hpp
+          cp -r ExtraFile/arduino-mqtt Firmware/ScribitESP/
+          cp -r ExtraFile/StepperDriver Firmware/ScribitESP/
+
+      - name: Build ESP32 firmware
+        run: |
+          docker-compose -f docker/docker-compose.yml run --rm scribit-firmware \
+            arduino-cli compile --fqbn briki:mbc-wb:mbc:mcu=esp \
+            --output-dir /workspace/builds \
+            /workspace/source/Firmware/ScribitESP/ScribitESP.ino
+
+      - name: Build SAMD21 firmware
+        run: |
+          docker-compose -f docker/docker-compose.yml run --rm scribit-firmware \
+            arduino-cli compile --fqbn briki:mbc-wb:mbc:mcu=samd \
+            --output-dir /workspace/builds \
+            /workspace/source/Firmware/MK4duo/MK4duo.ino
+
+      - name: Copy firmware to GUI app resources
+        run: |
+          mkdir -p gui-app/resources/firmware
+          cp docker/builds/ScribitESP.ino.bin gui-app/resources/firmware/
+          cp docker/builds/ScribitESP.ino.partitions.bin gui-app/resources/firmware/
+          cp docker/builds/MK4duo.ino.bin gui-app/resources/firmware/
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-bins
+          path: gui-app/resources/firmware/*.bin
+
+  build-app:
+    name: Build Electron App
+    needs: build-firmware
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-bins
+          path: gui-app/resources/firmware
+
+      - name: Install dependencies
+        working-directory: gui-app
+        run: npm install
+
+      - name: Build Electron app
+        working-directory: gui-app
+        run: npm run build
+
+      - name: Package app (macOS)
+        if: matrix.os == 'macos-latest'
+        working-directory: gui-app
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package app (Windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: gui-app
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload macOS installer
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-installer
+          path: gui-app/dist/*.dmg
+
+      - name: Upload Windows installer
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: gui-app/dist/*.exe
+
+  release:
+    name: Create Release
+    needs: build-app
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            mac-installer/*.dmg
+            windows-installer/*.exe
+            firmware-bins/*.bin
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
