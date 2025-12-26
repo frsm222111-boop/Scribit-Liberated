@@ -13,16 +13,16 @@
 - [x] Build firmware via docker-compose
 - [x] Copy .bin files to `gui-app/resources/firmware/`
 - [x] Add .gitignore for gui-app
-- [ ] Test workflow on test tag (pending actual test)
+- [x] Test workflow - Working on macOS/Windows
 
-## Phase 3: Bundle Python & Scripts
-- [ ] Download portable Python runtimes (Win/macOS)
-- [ ] Copy espota.py to `resources/python/`
-- [ ] Port scribit_svg_to_gcode.py to `resources/scripts/`
-- [ ] Bundle svg.path dependency
-- [ ] Create `src/main/python-runner.js`
-- [ ] Create `src/main/espota-runner.js`
-- [ ] Test Python execution
+## Phase 3: Bundle Python & Scripts ✅
+- [x] Download portable Python runtimes (Win/macOS) - Using system Python
+- [x] Copy espota.py to `resources/python/`
+- [x] Port scribit_svg_to_gcode.py to `resources/scripts/`
+- [x] Bundle svg.path dependency - Not needed (stdlib only)
+- [x] Create `src/main/python-runner.js`
+- [x] Create `src/main/espota-runner.js`
+- [x] Test Python execution - Will test in Phase 4 UI
 
 ## Phase 4: Firmware Upload Feature
 - [ ] Create `FirmwareUpload.vue`

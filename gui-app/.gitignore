@@ -27,7 +27,8 @@ npm-debug.log*
 __pycache__/
 *.pyc
 
-# Resources (will be added by GitHub Actions)
+# Resources
 resources/firmware/*.bin
-resources/python/*
-!resources/python/.gitkeep
+resources/python/__pycache__/
+!resources/python/*.py
+!resources/scripts/*.py
