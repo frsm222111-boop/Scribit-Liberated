@@ -19,30 +19,63 @@
 
         <div class="conversion-options">
           <h3>Scribit Configuration</h3>
-          <div class="options-grid">
-            <div class="option-group">
-              <label>Anchor Distance (mm)</label>
+
+          <div class="diagram-container">
+            <svg viewBox="0 0 400 300" class="scribit-diagram">
+              <!-- Anchor distance line (drawn first, behind everything) -->
+              <line x1="100" y1="50" x2="300" y2="50" stroke="#3498db" stroke-width="2" stroke-dasharray="5,5"/>
+
+              <!-- String lines -->
+              <line x1="100" y1="50" x2="200" y2="200" stroke="#2ecc71" stroke-width="3"/>
+              <line x1="300" y1="50" x2="200" y2="200" stroke="#9b59b6" stroke-width="3"/>
+
+              <!-- Left anchor (X) -->
+              <g transform="translate(100, 50)">
+                <line x1="-6" y1="-6" x2="6" y2="6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+                <line x1="-6" y1="6" x2="6" y2="-6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+              </g>
+
+              <!-- Right anchor (X) -->
+              <g transform="translate(300, 50)">
+                <line x1="-6" y1="-6" x2="6" y2="6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+                <line x1="-6" y1="6" x2="6" y2="-6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+              </g>
+
+              <!-- Device at center (two concentric circles) -->
+              <g transform="translate(200, 200)">
+                <!-- Outer circle -->
+                <circle cx="0" cy="0" r="12" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+                <!-- Inner circle -->
+                <circle cx="0" cy="0" r="6" fill="#ecf0f1" stroke="#34495e" stroke-width="1"/>
+              </g>
+
+              <!-- Labels -->
+              <text x="200" y="35" text-anchor="middle" fill="#7f8c8d" font-size="12">Anchor Distance</text>
+              <text x="120" y="125" text-anchor="middle" fill="#7f8c8d" font-size="12" transform="rotate(-52 120 125)">Left String</text>
+              <text x="280" y="125" text-anchor="middle" fill="#7f8c8d" font-size="12" transform="rotate(52 280 125)">Right String</text>
+            </svg>
+
+            <!-- Input overlays -->
+            <div class="diagram-input" style="top: 60px; left: 50%; transform: translateX(-50%);">
               <input type="number" v-model.number="options.anchorDistance" min="100" step="10" />
-              <small>Distance between left and right anchors</small>
+              <span>mm</span>
             </div>
 
-            <div class="option-group">
-              <label>Left String Length (mm)</label>
+            <div class="diagram-input" style="top: 120px; left: 15%;">
               <input type="number" v-model.number="options.leftLength" min="100" step="10" />
-              <small>Starting length of left string</small>
+              <span>mm</span>
             </div>
 
-            <div class="option-group">
-              <label>Right String Length (mm)</label>
+            <div class="diagram-input" style="top: 120px; right: 15%;">
               <input type="number" v-model.number="options.rightLength" min="100" step="10" />
-              <small>Starting length of right string</small>
+              <span>mm</span>
             </div>
+          </div>
 
-            <div class="option-group">
-              <label>Scale</label>
-              <input type="number" v-model.number="options.scale" min="0.1" max="10" step="0.1" />
-              <small>Scale factor for the drawing</small>
-            </div>
+          <div class="option-group" style="margin-top: 2rem;">
+            <label>Scale</label>
+            <input type="number" v-model.number="options.scale" min="0.1" max="10" step="0.1" />
+            <small>Scale factor for the drawing</small>
           </div>
         </div>
       </div>
@@ -242,10 +275,44 @@ async function convertAndSend() {
   margin-bottom: 1.5rem;
 }
 
-.options-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
+.diagram-container {
+  position: relative;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.scribit-diagram {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.diagram-input {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 2px solid #3498db;
+}
+
+.diagram-input input {
+  width: 80px;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.diagram-input span {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-weight: 500;
 }
 
 .option-group {
