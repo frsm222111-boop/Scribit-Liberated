@@ -101,9 +101,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import ProgressBar from '../components/ProgressBar.vue'
 import DeviceStatus from '../components/DeviceStatus.vue'
+import { getSvgOptions, setSvgOptions } from '../utils/appState'
 
 const selectedFile = ref('')
 const svgContent = ref('')
@@ -112,12 +113,19 @@ const progress = ref(0)
 const status = ref('')
 const statusType = ref('info')
 
-const options = ref({
+// Load saved options or use defaults
+const savedOptions = getSvgOptions()
+const options = ref(savedOptions || {
   anchorDistance: 1000,
   leftLength: 800,
   rightLength: 800,
   scale: 1.0
 })
+
+// Save options to localStorage when they change
+watch(options, (newOptions) => {
+  setSvgOptions(newOptions)
+}, { deep: true })
 
 const selectedFileName = computed(() => {
   if (!selectedFile.value) return ''
