@@ -5,8 +5,13 @@
       <p>Upload firmware to Scribit device via OTA</p>
 
       <div class="step" v-for="(step, idx) in steps" :key="idx" :class="{active: currentStep === idx}">
-        <h3>Step {{ idx + 1 }}{{ idx === 3 && currentStep === 3 ? `.${currentSubstep + 1}` : '' }}: {{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].title : step.title }}</h3>
-        <p>{{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].desc : step.desc }}</p>
+        <div class="step-header">
+          <div class="step-content">
+            <h3>Step {{ idx + 1 }}{{ idx === 3 && currentStep === 3 ? `.${currentSubstep + 1}` : '' }}: {{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].title : step.title }}</h3>
+            <p>{{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].desc : step.desc }}</p>
+          </div>
+          <LedIndicator v-if="idx !== 3" :mode="getLedMode(idx)" :label="getLedLabel(idx)" />
+        </div>
 
         <!-- Step 0: Verify ScribIt network -->
         <div v-if="idx === 0 && currentStep === 0">
@@ -96,6 +101,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ProgressBar from '../components/ProgressBar.vue'
 import WifiPrompt from '../components/WifiPrompt.vue'
+import LedIndicator from '../components/LedIndicator.vue'
 import { markSetupComplete, setDeviceId } from '../utils/appState'
 
 const router = useRouter()
@@ -336,14 +342,70 @@ async function uploadPartitions() {
   }
   uploading.value = false
 }
+
+function getLedMode(stepIndex) {
+  if (stepIndex === 0) {
+    return 'dark-blue'
+  } else if (stepIndex === 1) {
+    return 'pulse-white'
+  } else if (stepIndex === 2) {
+    return 'flash-white'
+  } else if (stepIndex === 3) {
+    // Step 4 substeps progression
+    if (currentSubstep.value === 0) {
+      return 'flash-white'
+    } else if (currentSubstep.value === 1) {
+      return 'off'
+    } else if (currentSubstep.value === 2 || currentSubstep.value === 3) {
+      return 'dark-blue'
+    } else if (currentSubstep.value === 4) {
+      return 'solid-white'
+    }
+  }
+  return 'off'
+}
+
+function getLedLabel(stepIndex) {
+  if (stepIndex === 0) {
+    return ''
+  } else if (stepIndex === 1) {
+    return 'Pulsing White'
+  } else if (stepIndex === 2) {
+    return 'Fast Flashing White'
+  } else if (stepIndex === 3) {
+    if (currentSubstep.value === 0) {
+      return 'Fast Flashing White'
+    } else if (currentSubstep.value === 1) {
+      return 'Off'
+    } else if (currentSubstep.value === 2 || currentSubstep.value === 3) {
+      return 'Dark Blue'
+    } else if (currentSubstep.value === 4) {
+      return 'Solid White'
+    }
+  }
+  return ''
+}
 </script>
 
 <style scoped>
 .firmware-upload { max-width: 800px; margin: 0 auto; }
 .step { opacity: 0.5; margin: 2rem 0; padding: 1.5rem; border-left: 4px solid #ddd; border-radius: 4px; }
-.step.active { opacity: 1; border-color: #3498db; background: #f8f9fa; }
+.step.active { opacity: 1; border-color: #3498db; background: #e8eaed; }
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.step-content {
+  flex: 1;
+}
+
 .step h3 { margin-bottom: 0.5rem; color: #2c3e50; }
-.step p { color: #7f8c8d; margin-bottom: 1rem; }
+.step p { color: #7f8c8d; margin-bottom: 0; }
 
 .verification-status {
   padding: 1rem;
