@@ -5,6 +5,9 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   // Firmware upload
   uploadFirmware: (firmware) => ipcRenderer.invoke('upload-firmware', firmware),
+  onFirmwareProgress: (callback) => {
+    ipcRenderer.on('firmware-upload-progress', (event, progress) => callback(progress))
+  },
 
   // G-code operations
   sendGcode: (gcode) => ipcRenderer.invoke('send-gcode', gcode),
@@ -12,6 +15,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // SVG to G-code conversion
   convertSvg: (svgPath) => ipcRenderer.invoke('convert-svg', svgPath),
+  onSvgProgress: (callback) => {
+    ipcRenderer.on('svg-convert-progress', (event, progress) => callback(progress))
+  },
 
   // File operations
   selectFile: (options) => ipcRenderer.invoke('select-file', options),

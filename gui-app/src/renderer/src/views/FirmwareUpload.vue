@@ -125,6 +125,16 @@ onMounted(() => {
   if (currentStep.value === 0) {
     startNetworkCheck()
   }
+
+  // Listen for firmware upload progress
+  window.electronAPI.onFirmwareProgress((progressData) => {
+    console.log('Firmware progress:', progressData)
+    if (progressData.type === 'info') {
+      status.value = progressData.data
+    } else if (progressData.type === 'stdout' || progressData.type === 'stderr') {
+      status.value += progressData.data
+    }
+  })
 })
 
 onUnmounted(() => {
@@ -172,7 +182,9 @@ async function upload() {
   progress.value = 0
   status.value = 'Uploading firmware...'
 
+  console.log('Starting firmware upload to 192.168.240.1')
   const result = await window.electronAPI.uploadFirmware({ espIp: '192.168.240.1' })
+  console.log('Upload result:', result)
 
   if (result.success) {
     progress.value = 100
@@ -180,6 +192,7 @@ async function upload() {
     markSetupComplete()
     setTimeout(() => router.push('/'), 2000)
   } else {
+    console.error('Upload failed:', result.error)
     status.value = 'Error: ' + result.error
   }
   uploading.value = false

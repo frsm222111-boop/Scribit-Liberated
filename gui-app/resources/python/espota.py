@@ -367,7 +367,7 @@ def main(args):
   if (options.spiffs):
     command = SPIFFS
   elif (options.companion):
-	command = COMPANION
+    command = COMPANION
 
   return serve(options.esp_ip, options.host_ip, options.esp_port, options.host_port, options.auth, options.image, command)
 # end main

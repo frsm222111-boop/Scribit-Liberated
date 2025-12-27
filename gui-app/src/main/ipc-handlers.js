@@ -23,6 +23,7 @@ function registerIpcHandlers() {
   })
   // Firmware upload handler
   ipcMain.handle('upload-firmware', async (event, options) => {
+    console.log('IPC: upload-firmware called with options:', options)
     try {
       const result = await uploadAllFirmware(
         {
@@ -32,11 +33,14 @@ function registerIpcHandlers() {
         },
         (progress) => {
           // Send progress updates to renderer
+          console.log('Progress:', progress)
           event.sender.send('firmware-upload-progress', progress)
         }
       )
+      console.log('Upload completed:', result)
       return result
     } catch (error) {
+      console.error('Upload error:', error)
       return {
         success: false,
         error: error.message

@@ -52,6 +52,11 @@ function uploadFirmware(options, onProgress) {
     const firmwareFilePath = path.join(firmwarePath, options.firmwareFile)
     const python = getPythonCommand()
 
+    console.log('Python path:', pythonPath)
+    console.log('Firmware path:', firmwarePath)
+    console.log('Espota script:', espotaPath)
+    console.log('Firmware file:', firmwareFilePath)
+
     // Build command arguments
     const args = [
       espotaPath,
@@ -76,6 +81,7 @@ function uploadFirmware(options, onProgress) {
       args.push('-s')
     }
 
+    console.log('Executing:', python, args.join(' '))
     const process = spawn(python, args)
     let output = ''
     let errorOutput = ''
@@ -97,6 +103,9 @@ function uploadFirmware(options, onProgress) {
     })
 
     process.on('close', (code) => {
+      console.log('Process exited with code:', code)
+      console.log('Output:', output)
+      console.log('Error output:', errorOutput)
       if (code === 0) {
         resolve({ success: true, output })
       } else {
@@ -109,6 +118,7 @@ function uploadFirmware(options, onProgress) {
     })
 
     process.on('error', (err) => {
+      console.error('Failed to start process:', err)
       reject(new Error(`Failed to start Python: ${err.message}`))
     })
   })
