@@ -4,7 +4,19 @@
       <h1>SVG to Scribit</h1>
       <p>Upload SVG files and send them directly to your Scribit device</p>
 
-      <DeviceStatus style="margin-bottom: 2rem;" />
+      <DeviceStatus />
+
+      <div v-if="drawingState !== 'idle'" class="drawing-controls">
+        <button class="btn btn-warning" @click="pauseDrawing" :disabled="pausedState === 'paused' || pausedState === 'pausing'">
+          Pause
+        </button>
+        <button class="btn btn-primary" @click="resumeDrawing" :disabled="pausedState === 'running'">
+          Resume
+        </button>
+        <button class="btn btn-danger" @click="stopDrawing" :disabled="drawingState === 'idle'">
+          Stop
+        </button>
+      </div>
 
       <div class="file-selector">
         <button class="btn btn-primary" @click="selectFile">Select SVG File</button>
@@ -92,7 +104,7 @@
       </div>
 
       <div v-if="selectedFile" class="actions">
-        <button class="btn btn-success" @click="convertAndSend" :disabled="processing">
+        <button class="btn btn-success" @click="convertAndSend" :disabled="processing || drawingState !== 'idle'">
           {{ processing ? 'Processing...' : 'Convert & Send to Device' }}
         </button>
       </div>
@@ -118,6 +130,9 @@ const processing = ref(false)
 const progress = ref(0)
 const status = ref('')
 const statusType = ref('info')
+const drawingState = ref('idle') // idle, drawing, paused
+const pausedState = ref('running') // running, pausing, paused
+let statusPollingInterval = null
 
 // Load saved options or use defaults
 const savedOptions = getSvgOptions()
@@ -132,6 +147,22 @@ const options = ref(savedOptions || {
 watch(options, (newOptions) => {
   setSvgOptions(newOptions)
 }, { deep: true })
+
+// Update status message when pausedState changes
+watch(pausedState, (newState) => {
+  if (drawingState.value === 'drawing') {
+    if (newState === 'pausing') {
+      status.value = 'Pausing drawing...'
+      statusType.value = 'info'
+    } else if (newState === 'paused') {
+      status.value = 'Drawing paused'
+      statusType.value = 'info'
+    } else if (newState === 'running') {
+      status.value = 'Drawing in progress...'
+      statusType.value = 'success'
+    }
+  }
+})
 
 const selectedFileName = computed(() => {
   if (!selectedFile.value) return ''
@@ -242,6 +273,44 @@ async function loadSvgContent(filePath) {
   }
 }
 
+async function pollDeviceStatus() {
+  try {
+    const result = await window.electronAPI.getDeviceStatus()
+    if (result.success && result.data) {
+      const deviceState = result.data.state
+      const devicePaused = result.data.paused || 'running'
+
+      pausedState.value = devicePaused
+
+      // If device is not printing, drawing is done
+      if (deviceState !== 'PRINTING') {
+        drawingState.value = 'idle'
+        pausedState.value = 'running'
+        stopPolling()
+        status.value = 'Drawing completed'
+        statusType.value = 'success'
+      }
+    }
+  } catch (error) {
+    console.error('Error polling device status:', error)
+  }
+}
+
+function startPolling() {
+  if (statusPollingInterval) {
+    clearInterval(statusPollingInterval)
+  }
+  statusPollingInterval = setInterval(pollDeviceStatus, 2000) // Poll every 2 seconds
+  pollDeviceStatus() // Immediate first poll
+}
+
+function stopPolling() {
+  if (statusPollingInterval) {
+    clearInterval(statusPollingInterval)
+    statusPollingInterval = null
+  }
+}
+
 async function convertAndSend() {
   processing.value = true
   progress.value = 0
@@ -289,6 +358,9 @@ async function convertAndSend() {
     if (sendResult.success) {
       status.value = 'Successfully sent to device! Drawing in progress...'
       statusType.value = 'success'
+      drawingState.value = 'drawing'
+      pausedState.value = 'running'
+      startPolling()
     } else {
       status.value = 'Failed to send to device: ' + sendResult.error
       statusType.value = 'error'
@@ -298,6 +370,59 @@ async function convertAndSend() {
     statusType.value = 'error'
   } finally {
     processing.value = false
+  }
+}
+
+async function pauseDrawing() {
+  try {
+    pausedState.value = 'pausing' // Optimistic update, watcher will update status
+    const result = await window.electronAPI.pauseDrawing()
+    if (!result.success) {
+      status.value = 'Failed to pause: ' + result.error
+      statusType.value = 'error'
+      pausedState.value = 'running' // Revert on error
+    }
+    // Polling will update pausedState to 'paused'
+  } catch (error) {
+    status.value = 'Error pausing: ' + error.message
+    statusType.value = 'error'
+    pausedState.value = 'running' // Revert on error
+  }
+}
+
+async function resumeDrawing() {
+  try {
+    pausedState.value = 'running' // Optimistic update, watcher will update status
+    const result = await window.electronAPI.resumeDrawing()
+    if (!result.success) {
+      status.value = 'Failed to resume: ' + result.error
+      statusType.value = 'error'
+      pausedState.value = 'paused' // Revert on error
+    }
+    // Polling will confirm state
+  } catch (error) {
+    status.value = 'Error resuming: ' + error.message
+    statusType.value = 'error'
+    pausedState.value = 'paused' // Revert on error
+  }
+}
+
+async function stopDrawing() {
+  try {
+    const result = await window.electronAPI.stopDrawing()
+    if (result.success) {
+      drawingState.value = 'idle'
+      pausedState.value = 'running'
+      stopPolling()
+      status.value = 'Drawing stopped'
+      statusType.value = 'info'
+    } else {
+      status.value = 'Failed to stop: ' + result.error
+      statusType.value = 'error'
+    }
+  } catch (error) {
+    status.value = 'Error stopping: ' + error.message
+    statusType.value = 'error'
   }
 }
 </script>
@@ -458,6 +583,13 @@ async function convertAndSend() {
 
 .actions {
   margin: 2rem 0;
+}
+
+.drawing-controls {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 1.5rem 0 2rem 0;
 }
 
 .status-message {

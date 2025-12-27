@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendGcode: (gcode) => ipcRenderer.invoke('send-gcode', gcode),
   getDeviceStatus: () => ipcRenderer.invoke('get-device-status'),
 
+  // Drawing control
+  pauseDrawing: () => ipcRenderer.invoke('pause-drawing'),
+  resumeDrawing: () => ipcRenderer.invoke('resume-drawing'),
+  stopDrawing: () => ipcRenderer.invoke('stop-drawing'),
+
   // SVG to G-code conversion
   convertSvg: (svgPath) => ipcRenderer.invoke('convert-svg', svgPath),
   onSvgProgress: (callback) => {

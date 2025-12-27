@@ -129,6 +129,51 @@ function registerIpcHandlers() {
     }
   })
 
+  // Pause drawing
+  ipcMain.handle('pause-drawing', async () => {
+    try {
+      const response = await axios.post('http://192.168.240.1:8888/pause', {}, {
+        timeout: 5000
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  })
+
+  // Resume drawing
+  ipcMain.handle('resume-drawing', async () => {
+    try {
+      const response = await axios.post('http://192.168.240.1:8888/resume', {}, {
+        timeout: 5000
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  })
+
+  // Stop drawing
+  ipcMain.handle('stop-drawing', async () => {
+    try {
+      const response = await axios.post('http://192.168.240.1:8888/stop', {}, {
+        timeout: 5000
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  })
+
   // SVG to G-code conversion
   ipcMain.handle('convert-svg', async (event, options) => {
     const os = require('os')

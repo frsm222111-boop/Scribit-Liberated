@@ -8,7 +8,7 @@
     </div>
 
     <div v-if="!connected" class="status-message warning">
-      <p>Device not connected. Make sure you're connected to MBC-WB WiFi network.</p>
+      <p>Device not connected. Make sure you're connected to ScribIt WiFi network.</p>
     </div>
 
     <div v-if="connected && deviceData" class="status-grid">
