@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   // Firmware upload
   uploadFirmware: (firmware) => ipcRenderer.invoke('upload-firmware', firmware),
+  uploadSingleFirmware: (options) => ipcRenderer.invoke('upload-single-firmware', options),
   onFirmwareProgress: (callback) => {
     ipcRenderer.on('firmware-upload-progress', (event, progress) => callback(progress))
   },

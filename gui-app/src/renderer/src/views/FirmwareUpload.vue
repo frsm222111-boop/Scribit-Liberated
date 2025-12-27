@@ -5,8 +5,8 @@
       <p>Upload firmware to Scribit device via OTA</p>
 
       <div class="step" v-for="(step, idx) in steps" :key="idx" :class="{active: currentStep === idx}">
-        <h3>Step {{ idx + 1}}: {{ step.title }}</h3>
-        <p>{{ step.desc }}</p>
+        <h3>Step {{ idx + 1 }}{{ idx === 3 && currentStep === 3 ? `.${currentSubstep + 1}` : '' }}: {{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].title : step.title }}</h3>
+        <p>{{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].desc : step.desc }}</p>
 
         <!-- Step 0: Verify ScribIt network -->
         <div v-if="idx === 0 && currentStep === 0">
@@ -22,8 +22,8 @@
         <div v-if="idx === 1 && currentStep === 1">
           <WifiPrompt @submit="sendWifi" />
           <button class="btn btn-secondary" @click="skipStep2" style="margin-top: 1rem;">Skip (Debug)</button>
+          <div v-if="status" class="verification-status info" style="margin-top: 1rem;">{{ status }}</div>
         </div>
-        <div v-if="idx === 1 && status" class="verification-status info">{{ status }}</div>
 
         <!-- Step 2: Verify MBC-WB network -->
         <div v-if="idx === 2 && currentStep === 2">
@@ -35,10 +35,56 @@
           </button>
         </div>
 
-        <!-- Step 3: Upload firmware -->
+        <!-- Step 3: Upload firmware with substeps -->
         <div v-if="idx === 3 && currentStep === 3">
-          <button v-if="!uploading" class="btn btn-success" @click="upload">Upload Firmware</button>
-          <ProgressBar v-if="uploading" :progress="progress" :message="status" />
+          <!-- Substep 0: Upload ESP32 firmware -->
+          <div v-if="currentSubstep === 0">
+            <button v-if="!uploading" class="btn btn-success" @click="uploadESP32">Upload ESP32 Firmware</button>
+            <div v-if="uploading">
+              <ProgressBar :progress="progress" />
+              <div v-if="status" class="verification-status info" style="margin-top: 1rem;">{{ status }}</div>
+            </div>
+          </div>
+
+          <!-- Substep 1: Reconnect after ESP32 upload -->
+          <div v-if="currentSubstep === 1">
+            <div class="verification-status" :class="networkStatus.type">
+              {{ networkStatus.message }}
+            </div>
+            <button class="btn btn-primary" @click="nextSubstep" :disabled="!reconnectVerified">
+              {{ reconnectVerified ? 'Continue' : 'Waiting for reconnection...' }}
+            </button>
+          </div>
+
+          <!-- Substep 2: Upload SAMD21 firmware -->
+          <div v-if="currentSubstep === 2">
+            <button v-if="!uploading" class="btn btn-success" @click="uploadSAMD21">Upload SAMD21 Firmware</button>
+            <div v-if="uploading">
+              <ProgressBar :progress="progress" />
+              <div v-if="status" class="verification-status info" style="margin-top: 1rem;">{{ status }}</div>
+            </div>
+          </div>
+
+          <!-- Substep 3: Reconnect after SAMD21 upload -->
+          <div v-if="currentSubstep === 3">
+            <div class="verification-status" :class="networkStatus.type">
+              {{ networkStatus.message }}
+            </div>
+            <button class="btn btn-primary" @click="nextSubstep" :disabled="!reconnectVerified">
+              {{ reconnectVerified ? 'Continue' : 'Waiting for reconnection...' }}
+            </button>
+          </div>
+
+          <!-- Substep 4: Upload ESP32 partitions -->
+          <div v-if="currentSubstep === 4">
+            <button v-if="!uploading" class="btn btn-success" @click="uploadPartitions">Upload Partitions</button>
+            <div v-if="uploading">
+              <ProgressBar :progress="progress" />
+              <div v-if="status" class="verification-status info" style="margin-top: 1rem;">{{ status }}</div>
+            </div>
+            <!-- Show status messages when not uploading -->
+            <div v-if="!uploading && status" class="verification-status info" style="margin-top: 1rem;">{{ status }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -54,12 +100,14 @@ import { markSetupComplete, setDeviceId } from '../utils/appState'
 
 const router = useRouter()
 const currentStep = ref(0)
+const currentSubstep = ref(0)
 const uploading = ref(false)
 const progress = ref(0)
 const status = ref('')
 const networkStatus = ref({ type: 'info', message: 'Checking network...' })
 const step0Verified = ref(false)
 const step2Verified = ref(false)
+const reconnectVerified = ref(false)
 
 let networkCheckInterval = null
 
@@ -67,7 +115,15 @@ const steps = [
   { title: 'Connect to ScribIt-XXXXXX', desc: 'Hold LED button 5+ sec, connect to ScribIt WiFi (password: ScribItAP314)' },
   { title: 'Send WiFi Credentials', desc: 'Enter your WiFi to trigger OTA mode' },
   { title: 'Connect to MBC-WB-XXXXXX', desc: 'Connect to MBC-WB network (IP: 192.168.240.1)' },
-  { title: 'Upload Firmware', desc: 'Upload firmware files' }
+  { title: 'Upload Firmware', desc: 'Upload firmware files in sequence' }
+]
+
+const substeps = [
+  { title: 'Upload ESP32 Firmware', desc: 'Upload main ESP32 firmware' },
+  { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
+  { title: 'Upload SAMD21 Firmware', desc: 'Upload companion chip firmware' },
+  { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
+  { title: 'Upload ESP32 Partitions', desc: 'Upload final partition data' }
 ]
 
 async function checkNetwork() {
@@ -99,6 +155,17 @@ async function checkNetwork() {
       step2Verified.value = false
     }
   }
+
+  // Step 3 substeps: Reconnect verification (substeps 1 and 3)
+  if (currentStep.value === 3 && (currentSubstep.value === 1 || currentSubstep.value === 3)) {
+    if (result.connected) {
+      networkStatus.value = { type: 'success', message: '✓ Device reconnected at http://192.168.240.1:8888/' }
+      reconnectVerified.value = true
+    } else {
+      networkStatus.value = { type: 'warning', message: 'Waiting for device reboot... Reconnect to MBC-WB WiFi' }
+      reconnectVerified.value = false
+    }
+  }
 }
 
 function startNetworkCheck() {
@@ -117,6 +184,15 @@ watch(currentStep, (newStep) => {
   if (newStep === 0 || newStep === 2) {
     startNetworkCheck()
   } else {
+    stopNetworkCheck()
+  }
+})
+
+watch(currentSubstep, (newSubstep) => {
+  if (currentStep.value === 3 && (newSubstep === 1 || newSubstep === 3)) {
+    reconnectVerified.value = false
+    startNetworkCheck()
+  } else if (currentStep.value === 3) {
     stopNetworkCheck()
   }
 })
@@ -144,6 +220,12 @@ onUnmounted(() => {
 function nextStep() {
   if (currentStep.value < 3) {
     currentStep.value++
+  }
+}
+
+function nextSubstep() {
+  if (currentSubstep.value < 4) {
+    currentSubstep.value++
   }
 }
 
@@ -177,18 +259,75 @@ async function sendWifi(creds) {
   }
 }
 
-async function upload() {
+async function uploadESP32() {
   uploading.value = true
   progress.value = 0
-  status.value = 'Uploading firmware...'
+  status.value = ''
 
-  console.log('Starting firmware upload to 192.168.240.1')
-  const result = await window.electronAPI.uploadFirmware({ espIp: '192.168.240.1' })
+  console.log('Starting ESP32 firmware upload')
+  const result = await window.electronAPI.uploadSingleFirmware({
+    espIp: '192.168.240.1',
+    firmwareFile: 'ScribitESP.ino.bin'
+  })
   console.log('Upload result:', result)
 
   if (result.success) {
     progress.value = 100
-    status.value = 'Upload complete! Redirecting to home...'
+    status.value = 'ESP32 firmware uploaded! Device will reboot.'
+    setTimeout(() => {
+      currentSubstep.value = 1
+      status.value = ''
+    }, 2000)
+  } else {
+    console.error('Upload failed:', result.error)
+    status.value = 'Error: ' + result.error
+  }
+  uploading.value = false
+}
+
+async function uploadSAMD21() {
+  uploading.value = true
+  progress.value = 0
+  status.value = ''
+
+  console.log('Starting SAMD21 firmware upload')
+  const result = await window.electronAPI.uploadSingleFirmware({
+    espIp: '192.168.240.1',
+    firmwareFile: 'MK4duo.ino.bin',
+    companion: true
+  })
+  console.log('Upload result:', result)
+
+  if (result.success) {
+    progress.value = 100
+    status.value = 'SAMD21 firmware uploaded! Device will reboot.'
+    setTimeout(() => {
+      currentSubstep.value = 3
+      status.value = ''
+    }, 2000)
+  } else {
+    console.error('Upload failed:', result.error)
+    status.value = 'Error: ' + result.error
+  }
+  uploading.value = false
+}
+
+async function uploadPartitions() {
+  uploading.value = true
+  progress.value = 0
+  status.value = ''
+
+  console.log('Starting partitions upload')
+  const result = await window.electronAPI.uploadSingleFirmware({
+    espIp: '192.168.240.1',
+    firmwareFile: 'ScribitESP.ino.partitions.bin',
+    spiffs: true
+  })
+  console.log('Upload result:', result)
+
+  if (result.success) {
+    progress.value = 100
+    status.value = 'All firmware uploaded! Redirecting to home...'
     markSetupComplete()
     setTimeout(() => router.push('/'), 2000)
   } else {
@@ -211,6 +350,9 @@ async function upload() {
   border-radius: 4px;
   margin-bottom: 1rem;
   font-weight: 500;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .verification-status.info {

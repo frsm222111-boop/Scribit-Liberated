@@ -21,7 +21,7 @@ function registerIpcHandlers() {
       return { success: true, connected: false }
     }
   })
-  // Firmware upload handler
+  // Firmware upload handler (all files)
   ipcMain.handle('upload-firmware', async (event, options) => {
     console.log('IPC: upload-firmware called with options:', options)
     try {
@@ -33,6 +33,37 @@ function registerIpcHandlers() {
         },
         (progress) => {
           // Send progress updates to renderer
+          console.log('Progress:', progress)
+          event.sender.send('firmware-upload-progress', progress)
+        }
+      )
+      console.log('Upload completed:', result)
+      return result
+    } catch (error) {
+      console.error('Upload error:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  })
+
+  // Single firmware file upload handler
+  ipcMain.handle('upload-single-firmware', async (event, options) => {
+    console.log('IPC: upload-single-firmware called with options:', options)
+    const { uploadFirmware } = require('./espota-runner')
+    try {
+      const result = await uploadFirmware(
+        {
+          espIp: options.espIp || '192.168.240.1',
+          firmwareFile: options.firmwareFile,
+          espPort: 3232,
+          companion: options.companion || false,
+          spiffs: options.spiffs || false,
+          hostIp: options.hostIp,
+          password: options.password
+        },
+        (progress) => {
           console.log('Progress:', progress)
           event.sender.send('firmware-upload-progress', progress)
         }
