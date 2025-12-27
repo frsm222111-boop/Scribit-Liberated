@@ -18,9 +18,9 @@ const router = createRouter({
       component: () => import('./views/FirmwareUpload.vue')
     },
     {
-      path: '/gcode',
-      name: 'gcode',
-      component: () => import('./views/GcodeSender.vue'),
+      path: '/svg',
+      name: 'svg',
+      component: () => import('./views/SvgConverter.vue'),
       meta: { requiresSetup: true }
     }
   ]

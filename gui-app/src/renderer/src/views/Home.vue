@@ -18,18 +18,10 @@
         </div>
 
         <div class="feature-card" :class="{ disabled: !setupComplete }">
-          <h2>G-code Sender</h2>
-          <p>Send G-code files to your device</p>
-          <router-link v-if="setupComplete" to="/gcode" class="btn btn-primary">Open G-code Sender</router-link>
+          <h2>SVG Sender</h2>
+          <p>Upload SVG files and send them directly to your Scribit device</p>
+          <router-link v-if="setupComplete" to="/svg" class="btn btn-primary">Open SVG Sender</router-link>
           <button v-else class="btn btn-primary" disabled>Complete Setup First</button>
-        </div>
-
-        <div class="feature-card" :class="{ disabled: !setupComplete }">
-          <h2>SVG Converter</h2>
-          <p>Convert SVG files to G-code</p>
-          <button class="btn btn-primary" :disabled="!setupComplete">
-            {{ setupComplete ? 'Coming Soon' : 'Complete Setup First' }}
-          </button>
         </div>
       </div>
     </div>

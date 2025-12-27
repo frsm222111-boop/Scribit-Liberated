@@ -131,13 +131,39 @@ function registerIpcHandlers() {
 
   // SVG to G-code conversion
   ipcMain.handle('convert-svg', async (event, options) => {
+    const os = require('os')
+    const path = require('path')
+    const fs = require('fs').promises
+
     try {
+      // Generate output path in temp directory
+      const tempDir = os.tmpdir()
+      const timestamp = Date.now()
+      const outputPath = path.join(tempDir, `scribit_${timestamp}.gcode`)
+
       const result = await convertSvgToGcode(
-        options,
+        {
+          ...options,
+          outputGcode: outputPath
+        },
         (progress) => {
           event.sender.send('svg-convert-progress', progress)
         }
       )
+
+      if (result.success) {
+        // Verify file was created
+        try {
+          await fs.access(outputPath)
+          return { ...result, outputPath }
+        } catch {
+          return {
+            success: false,
+            error: 'G-code file was not created'
+          }
+        }
+      }
+
       return result
     } catch (error) {
       return {
