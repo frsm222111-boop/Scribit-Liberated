@@ -21,11 +21,11 @@
               <line x1="50" y1="100" x2="750" y2="100" stroke="#3498db" stroke-width="3" stroke-dasharray="10,10"/>
 
               <!-- String lines -->
-              <line x1="50" y1="100" x2="400" y2="400" stroke="#2ecc71" stroke-width="4"/>
-              <line x1="750" y1="100" x2="400" y2="400" stroke="#9b59b6" stroke-width="4"/>
+              <line x1="50" y1="100" :x2="devicePosition.x" :y2="devicePosition.y" stroke="#2ecc71" stroke-width="4"/>
+              <line x1="750" y1="100" :x2="devicePosition.x" :y2="devicePosition.y" stroke="#9b59b6" stroke-width="4"/>
 
               <!-- SVG Drawing Overlay (scaled to actual size) -->
-              <g v-if="svgContent" opacity="0.6" :transform="`translate(400, 400) scale(${diagramScale})`">
+              <g v-if="svgContent" opacity="0.6" :transform="`translate(${devicePosition.x}, ${devicePosition.y}) scale(${diagramScale})`">
                 <foreignObject x="-400" y="-300" width="800" height="600">
                   <div
                     xmlns="http://www.w3.org/1999/xhtml"
@@ -48,7 +48,7 @@
               </g>
 
               <!-- Device at center (two concentric circles) -->
-              <g transform="translate(400, 400)">
+              <g :transform="`translate(${devicePosition.x}, ${devicePosition.y})`">
                 <!-- Outer circle -->
                 <circle cx="0" cy="0" r="16" fill="#34495e" stroke="#2c3e50" stroke-width="3"/>
                 <!-- Inner circle -->
@@ -58,22 +58,28 @@
             </svg>
 
             <!-- Input overlays -->
-            <div class="diagram-input" style="top: 80px; left: 50%; transform: translateX(-50%);">
+            <div class="diagram-input" :class="{ invalid: !isConfigValid }" style="top: 80px; left: 50%; transform: translateX(-50%);">
               <label>Anchor Distance</label>
-              <input type="number" v-model.number="options.anchorDistance" min="100" step="10" />
-              <span>mm</span>
+              <div class="input-row">
+                <input type="number" v-model.number="options.anchorDistance" min="100" step="10" />
+                <span>mm</span>
+              </div>
             </div>
 
-            <div class="diagram-input" style="top: 180px; left: 8%;">
+            <div class="diagram-input" :class="{ invalid: !isConfigValid }" :style="`top: ${leftStringInputPos.top}; left: ${leftStringInputPos.left}; transform: translate(-50%, -50%);`">
               <label>Left String</label>
-              <input type="number" v-model.number="options.leftLength" min="100" step="10" />
-              <span>mm</span>
+              <div class="input-row">
+                <input type="number" v-model.number="options.leftLength" min="100" step="10" />
+                <span>mm</span>
+              </div>
             </div>
 
-            <div class="diagram-input" style="top: 180px; right: 8%;">
+            <div class="diagram-input" :class="{ invalid: !isConfigValid }" :style="`top: ${rightStringInputPos.top}; left: ${rightStringInputPos.left}; transform: translate(-50%, -50%);`">
               <label>Right String</label>
-              <input type="number" v-model.number="options.rightLength" min="100" step="10" />
-              <span>mm</span>
+              <div class="input-row">
+                <input type="number" v-model.number="options.rightLength" min="100" step="10" />
+                <span>mm</span>
+              </div>
             </div>
           </div>
 
@@ -137,6 +143,73 @@ const diagramScale = computed(() => {
   // Scale SVG to match actual anchor distance
   const baseScale = 700 / options.value.anchorDistance
   return baseScale * options.value.scale
+})
+
+// Check if configuration is valid
+const isConfigValid = computed(() => {
+  const scaleFactor = 700 / options.value.anchorDistance
+  const r1 = options.value.leftLength * scaleFactor
+  const r2 = options.value.rightLength * scaleFactor
+  const d = 700 // Distance between anchors is always 700 units
+
+  // Triangle inequality: sum of two sides must be greater than third side
+  return r1 + r2 >= d && Math.abs(r1 - r2) <= d
+})
+
+// Calculate device position based on string lengths
+const devicePosition = computed(() => {
+  const x1 = 50  // Left anchor x
+  const y1 = 100 // Left anchor y
+  const x2 = 750 // Right anchor x
+  const y2 = 100 // Right anchor y
+
+  // Convert real-world lengths to diagram units
+  const scaleFactor = 700 / options.value.anchorDistance
+  const r1 = options.value.leftLength * scaleFactor  // Left string length
+  const r2 = options.value.rightLength * scaleFactor // Right string length
+
+  // Distance between anchors
+  const d = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+  // Check if strings can reach (triangle inequality)
+  if (!isConfigValid.value) {
+    // Invalid configuration, return center position
+    return { x: 400, y: 400 }
+  }
+
+  // Calculate intersection point (using circle intersection formula)
+  const a = (r1 ** 2 - r2 ** 2 + d ** 2) / (2 * d)
+  const h = Math.sqrt(r1 ** 2 - a ** 2)
+
+  // Point on line between anchors
+  const x3 = x1 + a * (x2 - x1) / d
+  const y3 = y1 + a * (y2 - y1) / d
+
+  // Device position (below the anchor line)
+  // Perpendicular to (x2-x1, y2-y1) pointing downward
+  const x = x3 - h * (y2 - y1) / d
+  const y = y3 + h * (x2 - x1) / d
+
+  return { x, y }
+})
+
+// Calculate input overlay positions (midpoint of each string)
+const leftStringInputPos = computed(() => {
+  const midX = (50 + devicePosition.value.x) / 2
+  const midY = (100 + devicePosition.value.y) / 2
+  return {
+    left: `${(midX / 800) * 100}%`,
+    top: `${(midY / 600) * 100}%`
+  }
+})
+
+const rightStringInputPos = computed(() => {
+  const midX = (750 + devicePosition.value.x) / 2
+  const midY = (100 + devicePosition.value.y) / 2
+  return {
+    left: `${(midX / 800) * 100}%`,
+    top: `${(midY / 600) * 100}%`
+  }
 })
 
 async function selectFile() {
@@ -288,15 +361,30 @@ async function convertAndSend() {
 
 .diagram-input {
   position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
   background: rgba(255, 255, 255, 0.92);
-  padding: 0.15rem 0.3rem;
+  padding: 0.2rem 0.3rem;
   border-radius: 3px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
   border: 1px solid #3498db;
   font-size: 0.65rem;
+}
+
+.diagram-input.invalid {
+  border-color: #e74c3c;
+  background: rgba(255, 235, 235, 0.92);
+}
+
+.diagram-input.invalid label {
+  color: #c0392b;
+}
+
+.diagram-input.invalid input {
+  border-color: #e74c3c;
+  color: #c0392b;
 }
 
 .diagram-input label {
@@ -306,16 +394,36 @@ async function convertAndSend() {
   white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.2px;
+  margin-bottom: 0.1rem;
+  text-align: center;
+}
+
+.diagram-input .input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
 }
 
 .diagram-input input {
-  width: 45px;
+  width: 48px;
   padding: 0.15rem 0.2rem;
   border: 1px solid #ddd;
   border-radius: 2px;
   font-size: 0.75rem;
   text-align: center;
   font-weight: 600;
+  box-sizing: border-box;
+}
+
+/* Remove number input spinners */
+.diagram-input input::-webkit-outer-spin-button,
+.diagram-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.diagram-input input[type=number] {
+  -moz-appearance: textfield;
 }
 
 .diagram-input span {
