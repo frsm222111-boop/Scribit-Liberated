@@ -16,17 +16,17 @@
           <h3>Scribit Configuration</h3>
 
           <div class="diagram-container">
-            <svg viewBox="0 0 400 300" class="scribit-diagram">
+            <svg viewBox="0 0 800 600" class="scribit-diagram">
               <!-- Anchor distance line (drawn first, behind everything) -->
-              <line x1="100" y1="50" x2="300" y2="50" stroke="#3498db" stroke-width="2" stroke-dasharray="5,5"/>
+              <line x1="50" y1="100" x2="750" y2="100" stroke="#3498db" stroke-width="3" stroke-dasharray="10,10"/>
 
               <!-- String lines -->
-              <line x1="100" y1="50" x2="200" y2="200" stroke="#2ecc71" stroke-width="3"/>
-              <line x1="300" y1="50" x2="200" y2="200" stroke="#9b59b6" stroke-width="3"/>
+              <line x1="50" y1="100" x2="400" y2="400" stroke="#2ecc71" stroke-width="4"/>
+              <line x1="750" y1="100" x2="400" y2="400" stroke="#9b59b6" stroke-width="4"/>
 
               <!-- SVG Drawing Overlay (scaled to actual size) -->
-              <g v-if="svgContent" opacity="0.6" :transform="`translate(200, 200) scale(${diagramScale})`">
-                <foreignObject x="-200" y="-150" width="400" height="300">
+              <g v-if="svgContent" opacity="0.6" :transform="`translate(400, 400) scale(${diagramScale})`">
+                <foreignObject x="-400" y="-300" width="800" height="600">
                   <div
                     xmlns="http://www.w3.org/1999/xhtml"
                     class="svg-overlay"
@@ -36,43 +36,42 @@
               </g>
 
               <!-- Left anchor (X) -->
-              <g transform="translate(100, 50)">
-                <line x1="-6" y1="-6" x2="6" y2="6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
-                <line x1="-6" y1="6" x2="6" y2="-6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+              <g transform="translate(50, 100)">
+                <line x1="-10" y1="-10" x2="10" y2="10" stroke="#e74c3c" stroke-width="4" stroke-linecap="round"/>
+                <line x1="-10" y1="10" x2="10" y2="-10" stroke="#e74c3c" stroke-width="4" stroke-linecap="round"/>
               </g>
 
               <!-- Right anchor (X) -->
-              <g transform="translate(300, 50)">
-                <line x1="-6" y1="-6" x2="6" y2="6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
-                <line x1="-6" y1="6" x2="6" y2="-6" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>
+              <g transform="translate(750, 100)">
+                <line x1="-10" y1="-10" x2="10" y2="10" stroke="#e74c3c" stroke-width="4" stroke-linecap="round"/>
+                <line x1="-10" y1="10" x2="10" y2="-10" stroke="#e74c3c" stroke-width="4" stroke-linecap="round"/>
               </g>
 
               <!-- Device at center (two concentric circles) -->
-              <g transform="translate(200, 200)">
+              <g transform="translate(400, 400)">
                 <!-- Outer circle -->
-                <circle cx="0" cy="0" r="12" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+                <circle cx="0" cy="0" r="16" fill="#34495e" stroke="#2c3e50" stroke-width="3"/>
                 <!-- Inner circle -->
-                <circle cx="0" cy="0" r="6" fill="#ecf0f1" stroke="#34495e" stroke-width="1"/>
+                <circle cx="0" cy="0" r="8" fill="#ecf0f1" stroke="#34495e" stroke-width="2"/>
               </g>
 
-              <!-- Labels -->
-              <text x="200" y="35" text-anchor="middle" fill="#7f8c8d" font-size="12">Anchor Distance</text>
-              <text x="120" y="125" text-anchor="middle" fill="#7f8c8d" font-size="12" transform="rotate(-52 120 125)">Left String</text>
-              <text x="280" y="125" text-anchor="middle" fill="#7f8c8d" font-size="12" transform="rotate(52 280 125)">Right String</text>
             </svg>
 
             <!-- Input overlays -->
-            <div class="diagram-input" style="top: 60px; left: 50%; transform: translateX(-50%);">
+            <div class="diagram-input" style="top: 80px; left: 50%; transform: translateX(-50%);">
+              <label>Anchor Distance</label>
               <input type="number" v-model.number="options.anchorDistance" min="100" step="10" />
               <span>mm</span>
             </div>
 
-            <div class="diagram-input" style="top: 120px; left: 15%;">
+            <div class="diagram-input" style="top: 180px; left: 8%;">
+              <label>Left String</label>
               <input type="number" v-model.number="options.leftLength" min="100" step="10" />
               <span>mm</span>
             </div>
 
-            <div class="diagram-input" style="top: 120px; right: 15%;">
+            <div class="diagram-input" style="top: 180px; right: 8%;">
+              <label>Right String</label>
               <input type="number" v-model.number="options.rightLength" min="100" step="10" />
               <span>mm</span>
             </div>
@@ -126,9 +125,9 @@ const selectedFileName = computed(() => {
 })
 
 const diagramScale = computed(() => {
-  // Diagram anchor distance is 200 units (from x=100 to x=300)
+  // Diagram anchor distance is 700 units (from x=50 to x=750)
   // Scale SVG to match actual anchor distance
-  const baseScale = 200 / options.value.anchorDistance
+  const baseScale = 700 / options.value.anchorDistance
   return baseScale * options.value.scale
 })
 
@@ -259,9 +258,9 @@ async function convertAndSend() {
 
 .diagram-container {
   position: relative;
-  max-width: 500px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 1rem 0;
 }
 
 .scribit-diagram {
@@ -283,27 +282,38 @@ async function convertAndSend() {
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: white;
-  padding: 0.3rem 0.6rem;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border: 2px solid #3498db;
+  gap: 0.2rem;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.15rem 0.3rem;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  border: 1px solid #3498db;
+  font-size: 0.65rem;
+}
+
+.diagram-input label {
+  font-size: 0.6rem;
+  color: #2c3e50;
+  font-weight: 700;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
 }
 
 .diagram-input input {
-  width: 80px;
-  padding: 0.3rem 0.5rem;
+  width: 45px;
+  padding: 0.15rem 0.2rem;
   border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: 2px;
+  font-size: 0.75rem;
   text-align: center;
+  font-weight: 600;
 }
 
 .diagram-input span {
-  font-size: 0.85rem;
+  font-size: 0.6rem;
   color: #7f8c8d;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .option-group {
