@@ -8,20 +8,20 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: () => import('./views/Home.vue'),
+      name: 'draw',
+      component: () => import('./views/SvgConverter.vue'),
+      meta: { requiresSetup: true }
+    },
+    {
+      path: '/manual',
+      name: 'manual',
+      component: () => import('./views/ManualControl.vue'),
       meta: { requiresSetup: true }
     },
     {
       path: '/firmware',
       name: 'firmware',
       component: () => import('./views/FirmwareUpload.vue')
-    },
-    {
-      path: '/svg',
-      name: 'svg',
-      component: () => import('./views/SvgConverter.vue'),
-      meta: { requiresSetup: true }
     }
   ]
 })

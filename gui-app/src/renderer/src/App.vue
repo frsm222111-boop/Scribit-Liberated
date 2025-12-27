@@ -3,7 +3,8 @@
     <nav class="navbar">
       <h1>Scribit Control</h1>
       <div class="nav-links">
-        <router-link to="/">Home</router-link>
+        <router-link to="/">Draw</router-link>
+        <router-link to="/manual">Manual Control</router-link>
         <router-link to="/firmware">Firmware Upload</router-link>
       </div>
     </nav>
