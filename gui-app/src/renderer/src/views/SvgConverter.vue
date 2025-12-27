@@ -1,8 +1,8 @@
 <template>
   <div class="svg-converter">
     <div class="card">
-      <h1>SVG to Scribit</h1>
-      <p>Upload SVG files and send them directly to your Scribit device</p>
+      <h1>Draw</h1>
+      <p>Upload an SVG or use one of the provided samples to draw using your device</p>
 
       <DeviceStatus />
 
@@ -21,6 +21,21 @@
       <div class="file-selector">
         <button class="btn btn-primary" @click="selectFile">Select SVG File</button>
         <span v-if="selectedFile" class="file-name">{{ selectedFileName }}</span>
+      </div>
+
+      <div v-if="samples.length > 0" class="samples-section">
+        <h3>Or choose a sample:</h3>
+        <div class="samples-grid">
+          <div
+            v-for="sample in samples"
+            :key="sample.filename"
+            class="sample-card"
+            :class="{ active: selectedFile === sample.path }"
+            @click="loadSample(sample)"
+          >
+            <div class="sample-name">{{ sample.name }}</div>
+          </div>
+        </div>
       </div>
 
       <div v-if="svgContent" class="svg-preview-section">
@@ -132,6 +147,7 @@ const status = ref('')
 const statusType = ref('info')
 const drawingState = ref('idle') // idle, drawing, paused
 const pausedState = ref('running') // running, pausing, paused
+const samples = ref([])
 let statusPollingInterval = null
 
 // Load saved options or use defaults
@@ -272,6 +288,26 @@ async function loadSvgContent(filePath) {
     statusType.value = 'error'
   }
 }
+
+async function loadSamples() {
+  try {
+    const result = await window.electronAPI.listSamples()
+    if (result.success) {
+      samples.value = result.samples
+    }
+  } catch (error) {
+    console.error('Error loading samples:', error)
+  }
+}
+
+async function loadSample(sample) {
+  selectedFile.value = sample.path
+  await loadSvgContent(sample.path)
+}
+
+onMounted(() => {
+  loadSamples()
+})
 
 async function pollDeviceStatus() {
   try {
@@ -444,6 +480,50 @@ async function stopDrawing() {
   color: #2c3e50;
   font-family: monospace;
   word-break: break-all;
+}
+
+.samples-section {
+  margin: 2rem 0;
+}
+
+.samples-section h3 {
+  font-size: 1rem;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.samples-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.sample-card {
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.sample-card:hover {
+  border-color: #3498db;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.sample-card.active {
+  border-color: #3498db;
+  background: #e3f2fd;
+  font-weight: 600;
+}
+
+.sample-name {
+  color: #2c3e50;
+  font-size: 0.9rem;
+  word-break: break-word;
 }
 
 .svg-preview-section {

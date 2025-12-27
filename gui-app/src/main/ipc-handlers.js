@@ -248,6 +248,40 @@ function registerIpcHandlers() {
       }
     }
   })
+
+  // List sample SVG files
+  ipcMain.handle('list-samples', async () => {
+    const fs = require('fs').promises
+    const path = require('path')
+    const { app } = require('electron')
+    try {
+      // Use app.getAppPath() to get the correct base path
+      // In dev: points to project root, in production: points to app.asar
+      const appPath = app.getAppPath()
+      const samplesDir = path.join(appPath, 'samples')
+
+      console.log('Looking for samples in:', samplesDir)
+
+      const files = await fs.readdir(samplesDir)
+      const svgFiles = files.filter(file => file.toLowerCase().endsWith('.svg'))
+
+      console.log('Found SVG files:', svgFiles)
+
+      const samples = svgFiles.map(file => ({
+        name: file.replace('.svg', ''),
+        filename: file,
+        path: path.join(samplesDir, file)
+      }))
+
+      return { success: true, samples }
+    } catch (error) {
+      console.error('Error listing samples:', error)
+      return {
+        success: true,
+        samples: [] // Empty array if samples folder doesn't exist or has no files
+      }
+    }
+  })
 }
 
 module.exports = { registerIpcHandlers }
