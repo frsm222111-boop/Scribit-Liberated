@@ -163,6 +163,20 @@ function registerIpcHandlers() {
       filePath: result.filePaths[0]
     }
   })
+
+  // Read file
+  ipcMain.handle('read-file', async (event, filePath) => {
+    const fs = require('fs').promises
+    try {
+      const content = await fs.readFile(filePath, 'utf-8')
+      return { success: true, content }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  })
 }
 
 module.exports = { registerIpcHandlers }

@@ -16,6 +16,12 @@ const router = createRouter({
       path: '/firmware',
       name: 'firmware',
       component: () => import('./views/FirmwareUpload.vue')
+    },
+    {
+      path: '/gcode',
+      name: 'gcode',
+      component: () => import('./views/GcodeSender.vue'),
+      meta: { requiresSetup: true }
     }
   ]
 })
