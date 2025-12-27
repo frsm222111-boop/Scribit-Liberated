@@ -12,11 +12,6 @@
       </div>
 
       <div v-if="svgContent" class="svg-preview-section">
-        <h3>SVG Preview</h3>
-        <div class="svg-preview">
-          <div v-html="svgContent" class="svg-container"></div>
-        </div>
-
         <div class="conversion-options">
           <h3>Scribit Configuration</h3>
 
@@ -28,6 +23,17 @@
               <!-- String lines -->
               <line x1="100" y1="50" x2="200" y2="200" stroke="#2ecc71" stroke-width="3"/>
               <line x1="300" y1="50" x2="200" y2="200" stroke="#9b59b6" stroke-width="3"/>
+
+              <!-- SVG Drawing Overlay (scaled to actual size) -->
+              <g v-if="svgContent" opacity="0.6" :transform="`translate(200, 200) scale(${diagramScale})`">
+                <foreignObject x="-200" y="-150" width="400" height="300">
+                  <div
+                    xmlns="http://www.w3.org/1999/xhtml"
+                    class="svg-overlay"
+                    v-html="svgContent"
+                  ></div>
+                </foreignObject>
+              </g>
 
               <!-- Left anchor (X) -->
               <g transform="translate(100, 50)">
@@ -117,6 +123,13 @@ const options = ref({
 const selectedFileName = computed(() => {
   if (!selectedFile.value) return ''
   return selectedFile.value.split('/').pop()
+})
+
+const diagramScale = computed(() => {
+  // Diagram anchor distance is 200 units (from x=100 to x=300)
+  // Scale SVG to match actual anchor distance
+  const baseScale = 200 / options.value.anchorDistance
+  return baseScale * options.value.scale
 })
 
 async function selectFile() {
@@ -232,37 +245,6 @@ async function convertAndSend() {
   margin: 2rem 0;
 }
 
-.svg-preview-section h3 {
-  color: #2c3e50;
-  margin-bottom: 1rem;
-}
-
-.svg-preview {
-  background: #f8f9fa;
-  padding: 2rem;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  margin-bottom: 2rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 300px;
-}
-
-.svg-container {
-  max-width: 100%;
-  max-height: 400px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.svg-container :deep(svg) {
-  max-width: 100%;
-  max-height: 400px;
-  height: auto;
-}
-
 .conversion-options {
   background: #f8f9fa;
   padding: 1.5rem;
@@ -286,6 +268,15 @@ async function convertAndSend() {
   width: 100%;
   height: auto;
   display: block;
+}
+
+.svg-overlay {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
 }
 
 .diagram-input {
