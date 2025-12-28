@@ -9,8 +9,7 @@
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "postdist": "node scripts/sign-mac.js"
+    "dist": "electron-builder"
   },
   "keywords": [
     "unbrickit",
@@ -44,6 +43,7 @@
     "appId": "com.unbrickit.app",
     "productName": "UnBrickIt",
     "publish": null,
+    "afterPack": "./scripts/sign-mac.js",
     "directories": {
       "output": "dist",
       "buildResources": "resources"
