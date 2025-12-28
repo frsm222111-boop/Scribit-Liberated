@@ -2,6 +2,8 @@ const { ipcMain, dialog } = require('electron')
 const { uploadAllFirmware } = require('./espota-runner')
 const { convertSvgToGcode } = require('./python-runner')
 const axios = require('axios')
+const Store = require('electron-store')
+const store = new Store()
 
 /**
  * Register all IPC handlers
@@ -281,6 +283,24 @@ function registerIpcHandlers() {
         samples: [] // Empty array if samples folder doesn't exist or has no files
       }
     }
+  })
+
+  // License management
+  ipcMain.handle('get-license-key', async () => {
+    return {
+      success: true,
+      key: store.get('licenseKey', '')
+    }
+  })
+
+  ipcMain.handle('save-license-key', async (event, key) => {
+    store.set('licenseKey', key)
+    return { success: true }
+  })
+
+  ipcMain.handle('clear-license-key', async () => {
+    store.delete('licenseKey')
+    return { success: true }
   })
 }
 

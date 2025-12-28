@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, shell } = require('electron')
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -32,5 +32,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Network operations
   sendWifiCredentials: (credentials) => ipcRenderer.invoke('send-wifi-credentials', credentials),
-  checkDeviceConnection: () => ipcRenderer.invoke('check-device-connection')
+  checkDeviceConnection: () => ipcRenderer.invoke('check-device-connection'),
+
+  // License management
+  getLicenseKey: () => ipcRenderer.invoke('get-license-key'),
+  saveLicenseKey: (key) => ipcRenderer.invoke('save-license-key', key),
+  clearLicenseKey: () => ipcRenderer.invoke('clear-license-key'),
+
+  // External links
+  openExternal: (url) => shell.openExternal(url)
 })

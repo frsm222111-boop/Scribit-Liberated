@@ -6,6 +6,7 @@
         <router-link to="/">Draw</router-link>
         <router-link to="/manual">Manual Control</router-link>
         <router-link to="/firmware">Firmware Upload</router-link>
+        <router-link to="/license">License</router-link>
       </div>
     </nav>
     <main class="main-content">
@@ -168,6 +169,15 @@ body {
 
 .btn-danger:hover:not(:disabled) {
   background: #c0392b;
+}
+
+.btn-secondary {
+  background: #95a5a6;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #7f8c8d;
 }
 
 .btn-warning {
