@@ -2,8 +2,8 @@ const { ipcMain, dialog } = require('electron')
 const { uploadAllFirmware } = require('./espota-runner')
 const { convertSvgToGcode } = require('./python-runner')
 const axios = require('axios')
-const Store = require('electron-store')
-const store = new Store()
+const ElectronStore = require('electron-store')
+const store = new ElectronStore.default()
 
 /**
  * Register all IPC handlers
