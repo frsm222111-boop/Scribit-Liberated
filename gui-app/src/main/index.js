@@ -1,5 +1,6 @@
 const { app, BrowserWindow } = require('electron')
 const path = require('path')
+const url = require('url')
 const { registerIpcHandlers } = require('./ipc-handlers')
 
 function createWindow() {
@@ -18,7 +19,11 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+    mainWindow.loadURL(url.format({
+      pathname: path.join(__dirname, '../renderer/index.html'),
+      protocol: 'file:',
+      slashes: true
+    }))
   }
 }
 
