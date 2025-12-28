@@ -10,7 +10,14 @@
             <h3>Step {{ idx + 1 }}{{ idx === 3 && currentStep === 3 ? `.${currentSubstep + 1}` : '' }}: {{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].title : step.title }}</h3>
             <p>{{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].desc : step.desc }}</p>
           </div>
-          <LedIndicator v-if="idx !== 3" :mode="getLedMode(idx)" :label="getLedLabel(idx)" />
+          <div v-if="idx !== 3" class="led-container">
+            <!-- Arrow pointing down to left of LED (only for step 1) -->
+            <svg v-if="idx === 0" class="led-arrow" viewBox="0 0 40 60" width="40" height="60">
+              <path d="M 20 10 L 20 40" stroke="#3498db" stroke-width="3" fill="none" />
+              <path d="M 10 30 L 20 40 L 30 30" stroke="#3498db" stroke-width="3" fill="none" stroke-linejoin="round" />
+            </svg>
+            <LedIndicator :mode="getLedMode(idx)" :label="getLedLabel(idx)" />
+          </div>
         </div>
 
         <!-- Step 0: Verify ScribIt network -->
@@ -435,5 +442,16 @@ function getLedLabel(stepIndex) {
 .verification-status.error {
   background: #f8d7da;
   color: #721c24;
+}
+
+.led-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.led-arrow {
+  flex-shrink: 0;
+  transform: translateX(110%) translateY(-10px);
 }
 </style>
