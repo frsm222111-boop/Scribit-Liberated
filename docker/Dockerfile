@@ -29,13 +29,15 @@ RUN mkdir -p ${ARDUINO_USER_DIR}/libraries ${ARDUINO15_DIR}/packages
 # Install Arduino CLI
 RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s ${ARDUINO_CLI_VERSION}
 
-# Install briki:mbc-wb board package
+# Install briki:mbc-wb board package with retry for network issues
 RUN arduino-cli config init && \
     arduino-cli config add board_manager.additional_urls https://www.briki.org/download/resources/package_briki_index.json && \
     arduino-cli config add board_manager.additional_urls https://dl.espressif.com/dl/package_esp32_dev_index.json && \
-    arduino-cli core update-index && \
-    # Install board packages
-    arduino-cli core install briki:mbc-wb@2.0.0
+    # Retry update-index and install (handles transient briki.org timeouts)
+    for i in 1 2 3; do \
+        (arduino-cli core update-index && arduino-cli core install briki:mbc-wb@2.0.0) && break || \
+        ([ $i -lt 3 ] && echo "Retry $i/3 (briki.org timeout)..." && sleep 10) || exit 1; \
+    done
 
 # Copy hardware override files
 RUN test -f ${ARDUINO15_DIR}/packages/briki/hardware/mbc-wb/2.0.0/tools/partitions/8MB_ffat.csv
