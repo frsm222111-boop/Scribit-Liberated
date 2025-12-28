@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <nav class="navbar">
-      <h1>Scribit Control</h1>
+      <h1>UnBrickIt</h1>
       <div class="nav-links">
         <router-link to="/">Draw</router-link>
         <router-link to="/manual">Manual Control</router-link>

@@ -1,7 +1,7 @@
 {
-  "name": "scribit-control",
+  "name": "unbrickit",
   "version": "1.0.0",
-  "description": "GUI tool for Scribit firmware upload and G-code control",
+  "description": "Control app for UnBrickIt wall drawing robot",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -12,7 +12,10 @@
     "dist": "electron-builder"
   },
   "keywords": [
-    "scribit",
+    "unbrickit",
+    "wall",
+    "drawing",
+    "robot",
     "firmware",
     "gcode",
     "electron"
@@ -37,8 +40,8 @@
     "vue-router": "^4.6.4"
   },
   "build": {
-    "appId": "com.scribit.control",
-    "productName": "Scribit Control",
+    "appId": "com.unbrickit.app",
+    "productName": "UnBrickIt",
     "publish": null,
     "directories": {
       "output": "dist",

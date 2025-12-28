@@ -59,8 +59,7 @@ onMounted(async () => {
 
 function purchaseLicense() {
   // Open Gumroad with device ID pre-filled
-  // TODO: Replace with your actual Gumroad product URL
-  const gumroadUrl = `https://yourproduct.gumroad.com/l/scribit-license?wanted[device_id]=${encodeURIComponent(deviceId.value)}`
+  const gumroadUrl = `https://robotkareem.gumroad.com/l/unbrickit?wanted[device_id]=${encodeURIComponent(deviceId.value)}`
   window.electronAPI.openExternal(gumroadUrl)
 }
 
