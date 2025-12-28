@@ -1,6 +1,6 @@
 # UnBrickIt GUI
 
-Desktop app for UnBrickIt firmware upload and G-code control.
+Desktop app for ScribIt firmware upload and G-code control.
 
 ## Installation
 

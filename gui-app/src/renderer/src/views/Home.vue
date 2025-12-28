@@ -2,7 +2,7 @@
   <div class="home">
     <div class="card welcome-card">
       <h1>Welcome to UnBrickIt</h1>
-      <p class="subtitle">Manage your UnBrickIt device firmware and operations</p>
+      <p class="subtitle">Manage your ScribIt device firmware and operations</p>
 
       <div v-if="!setupComplete" class="setup-required">
         <h3>⚠️ Initial Setup Required</h3>
@@ -13,13 +13,13 @@
       <div class="features">
         <div class="feature-card">
           <h2>Firmware Upload</h2>
-          <p>Update your UnBrickIt device firmware over WiFi</p>
+          <p>Update your ScribIt device firmware over WiFi</p>
           <router-link to="/firmware" class="btn btn-primary">Go to Firmware Upload</router-link>
         </div>
 
         <div class="feature-card" :class="{ disabled: !setupComplete }">
           <h2>SVG Sender</h2>
-          <p>Upload SVG files and send them directly to your UnBrickIt device</p>
+          <p>Upload SVG files and send them directly to your ScribIt device</p>
           <router-link v-if="setupComplete" to="/svg" class="btn btn-primary">Open SVG Sender</router-link>
           <button v-else class="btn btn-primary" disabled>Complete Setup First</button>
         </div>

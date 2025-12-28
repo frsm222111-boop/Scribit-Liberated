@@ -1,7 +1,7 @@
 {
   "name": "unbrickit",
   "version": "1.0.0",
-  "description": "Control app for UnBrickIt wall drawing robot",
+  "description": "Control app for ScribIt wall drawing robot",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
