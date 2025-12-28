@@ -1,6 +1,6 @@
-# Scribit Control GUI
+# UnBrickIt GUI
 
-Desktop app for Scribit firmware upload and G-code control.
+Desktop app for UnBrickIt firmware upload and G-code control.
 
 ## Installation
 
@@ -8,13 +8,9 @@ Desktop app for Scribit firmware upload and G-code control.
 
 1. Download `.dmg` from [Releases](https://github.com/karimi/scrubit/releases)
 2. Open DMG, drag to Applications
-3. **Important:** Run this command before opening:
-   ```bash
-   xattr -cr /Applications/Scribit\ Control.app
-   ```
-4. Open app from Applications
+3. Open app from Applications
 
-**Why this step?** Unsigned apps require removing quarantine attribute. We'll add proper signing in future releases.
+The app is ad-hoc signed and ready to use.
 
 ### Windows
 
