@@ -10,7 +10,7 @@
             <h3>Step {{ idx + 1 }}{{ idx === 3 && currentStep === 3 ? `.${currentSubstep + 1}` : '' }}: {{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].title : step.title }}</h3>
             <p>{{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].desc : step.desc }}</p>
           </div>
-          <div v-if="idx !== 3" class="led-container">
+          <div v-if="idx !== 3 && currentStep === idx" class="led-container">
             <!-- Arrow pointing down to left of LED (only for step 1) -->
             <svg v-if="idx === 0" class="led-arrow" viewBox="0 0 40 60" width="40" height="60">
               <path d="M 20 10 L 20 40" stroke="#3498db" stroke-width="3" fill="none" />
@@ -125,9 +125,9 @@ const reconnectVerified = ref(false)
 let networkCheckInterval = null
 
 const steps = [
-  { title: 'Connect to ScribIt-XXXXXX', desc: 'Hold LED button 5+ sec, connect to ScribIt WiFi (password: ScribItAP314)' },
-  { title: 'Send WiFi Credentials', desc: 'Enter your WiFi to trigger OTA mode' },
-  { title: 'Connect to MBC-WB-XXXXXX', desc: 'Connect to MBC-WB network (IP: 192.168.240.1)' },
+  { title: 'Connect to ScribIt-.....', desc: 'Hold left side of the LED 5+ sec, device reboots. \nWhen back online connect to ScribIt-.... WiFi (password: ScribItAP314 if needed)' },
+  { title: 'Send WiFi Credentials', desc: 'Enter your home WiFi credentials to trigger OTA mode' },
+  { title: 'Connect to MBC-WB-.....', desc: 'A new WiFi network named MBC-WB-..... should appear. Connect to it' },
   { title: 'Upload Firmware', desc: 'Upload firmware files in sequence' }
 ]
 

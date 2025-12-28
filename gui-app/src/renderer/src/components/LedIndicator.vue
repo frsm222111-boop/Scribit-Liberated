@@ -66,8 +66,8 @@ const animationClass = computed(() => {
 }
 
 .led-arch {
-  width: 80px;
-  height: 48px;
+  width: 120px;
+  height: 72px;
   filter: drop-shadow(0 0 4px rgba(0,0,0,0.3));
 }
 
