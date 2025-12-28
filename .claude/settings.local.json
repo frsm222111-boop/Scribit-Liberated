@@ -6,7 +6,11 @@
       "Bash(docker-compose:*)",
       "Bash(python3:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run dist:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

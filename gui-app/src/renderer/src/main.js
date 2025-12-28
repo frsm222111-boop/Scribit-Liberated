@@ -22,11 +22,6 @@ const router = createRouter({
       path: '/firmware',
       name: 'firmware',
       component: () => import('./views/FirmwareUpload.vue')
-    },
-    {
-      path: '/license',
-      name: 'license',
-      component: () => import('./views/License.vue')
     }
   ]
 })

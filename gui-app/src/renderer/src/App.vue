@@ -6,7 +6,6 @@
         <router-link to="/">Draw</router-link>
         <router-link to="/manual">Manual Control</router-link>
         <router-link to="/firmware">Firmware Upload</router-link>
-        <router-link to="/license">License</router-link>
       </div>
     </nav>
     <main class="main-content">
@@ -14,6 +13,9 @@
     </main>
     <footer class="app-footer">
       <div class="footer-content">
+        <a href="https://www.buymeacoffee.com/unbrickit" target="_blank" class="donate-link">
+          ☕ Buy Me a Coffee
+        </a>
         <div class="connection-status">
           <!-- WiFi icon -->
           <svg v-if="connected" class="wifi-icon connected" viewBox="0 0 24 24" width="20" height="20">
@@ -237,8 +239,23 @@ body {
 
 .footer-content {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
+}
+
+.donate-link {
+  color: #f39c12;
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.donate-link:hover {
+  background: rgba(243, 156, 18, 0.1);
+  color: #f1c40f;
 }
 
 .connection-status {

@@ -34,11 +34,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendWifiCredentials: (credentials) => ipcRenderer.invoke('send-wifi-credentials', credentials),
   checkDeviceConnection: () => ipcRenderer.invoke('check-device-connection'),
 
-  // License management
-  getLicenseKey: () => ipcRenderer.invoke('get-license-key'),
-  saveLicenseKey: (key) => ipcRenderer.invoke('save-license-key', key),
-  clearLicenseKey: () => ipcRenderer.invoke('clear-license-key'),
-
   // External links
   openExternal: (url) => shell.openExternal(url)
 })
