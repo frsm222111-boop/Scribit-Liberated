@@ -350,8 +350,9 @@ clearLicenseKey: () => ipcRenderer.invoke('clear-license-key'),
 
 1. **Create Gumroad Product:**
    - Go to gumroad.com → Products → New Product
-   - Set name: "ScribIt License"
+   - Set name: "UnBrickIt License"
    - Set price: e.g., $49
+   - Product URL: https://robotkareem.gumroad.com/l/unbrickit
    - Add custom field:
      - Name: `device_id`
      - Label: "Device ID"
@@ -423,7 +424,7 @@ onMounted(async () => {
 
 function purchaseLicense() {
   // Open Gumroad with device ID pre-filled
-  const gumroadUrl = `https://yourproduct.gumroad.com/l/scribit-license?wanted[device_id]=${encodeURIComponent(deviceId.value)}`;
+  const gumroadUrl = `https://robotkareem.gumroad.com/l/unbrickit?wanted[device_id]=${encodeURIComponent(deviceId.value)}`;
   window.electronAPI.openExternal(gumroadUrl);
 }
 
@@ -518,7 +519,7 @@ When customer completes purchase:
   ```
 - Email license key to customer:
   ```
-  Subject: Your ScribIt License Key
+  Subject: Your UnBrickIt License Key
 
   Hi [Name],
 
@@ -529,7 +530,7 @@ When customer completes purchase:
   [GENERATED_LICENSE_KEY_HERE]
 
   To activate:
-  1. Open ScribIt app
+  1. Open UnBrickIt app
   2. Go to License tab
   3. Paste the key above
   4. Click "Activate License"
@@ -545,7 +546,7 @@ When customer completes purchase:
 1. **User opens app** → App fetches device ID from firmware status endpoint
 2. **User clicks "Purchase License"** → Opens browser to Gumroad with URL:
    ```
-   https://yourproduct.gumroad.com/l/scribit-license?wanted[device_id]=scribit_abc123
+   https://robotkareem.gumroad.com/l/unbrickit?wanted[device_id]=scribit_abc123
    ```
 3. **Gumroad checkout** → Device ID pre-filled (read-only or editable)
 4. **Customer pays** → No account needed, guest checkout
