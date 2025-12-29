@@ -17,7 +17,7 @@
     <footer v-if="!isWelcomeScreen" class="app-footer">
       <div class="footer-content">
         <a href="#" @click.prevent="openDonationPage" class="donate-link">
-          ☕ make a donation if you like
+          ☕ Support me on Ko-fi
         </a>
         <div class="connection-status">
           <!-- WiFi icon -->
@@ -29,6 +29,9 @@
             <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2"/>
           </svg>
           <span class="device-id">{{ deviceId || 'No device' }}{{ firmwareVersion ? ` (v${firmwareVersion})` : '' }}</span>
+          <span v-if="deviceState" class="status-badge" :class="deviceStateClass">
+            {{ deviceState }}
+          </span>
         </div>
       </div>
     </footer>
@@ -47,6 +50,7 @@ const route = useRoute()
 const connected = ref(false)
 const deviceId = ref(getDeviceId())
 const firmwareVersion = ref(getFirmwareVersion())
+const deviceState = ref(null)
 const guiVersion = ref(packageJson.version)
 let connectionPollInterval = null
 
@@ -80,6 +84,16 @@ const firmwareTabTitle = computed(() => {
   return 'Firmware Upload'
 })
 
+const deviceStateClass = computed(() => {
+  if (!deviceState.value) return ''
+  const state = deviceState.value.toLowerCase()
+  if (state === 'running' || state === 'drawing') return 'state-running'
+  if (state === 'idle' || state === 'ready') return 'state-idle'
+  if (state === 'error') return 'state-error'
+  if (state === 'paused') return 'state-paused'
+  return 'state-connected'
+})
+
 function compareVersions(v1, v2) {
   const parts1 = v1.split('.').map(Number)
   const parts2 = v2.split('.').map(Number)
@@ -100,7 +114,7 @@ async function checkConnection() {
     const result = await window.electronAPI.checkDeviceConnection()
     connected.value = result.connected
 
-    // If connected, fetch device ID and version from status
+    // If connected, fetch device ID, version, and state from status
     if (result.connected) {
       const statusResult = await window.electronAPI.getDeviceStatus()
       if (statusResult.success && statusResult.data) {
@@ -111,15 +125,20 @@ async function checkConnection() {
           firmwareVersion.value = statusResult.data.version
           setFirmwareVersion(statusResult.data.version)
         }
+        if (statusResult.data.state) {
+          deviceState.value = statusResult.data.state
+        }
       }
     } else {
-      // Not connected - clear firmware version
+      // Not connected - clear firmware version and state
       firmwareVersion.value = null
+      deviceState.value = null
       setFirmwareVersion(null)
     }
   } catch (error) {
     connected.value = false
     firmwareVersion.value = null
+    deviceState.value = null
     setFirmwareVersion(null)
   }
 }
@@ -347,6 +366,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 2rem;
 }
 
 .donate-link {
@@ -388,5 +408,38 @@ body {
   font-family: monospace;
   font-size: 0.85rem;
   color: #546e7a;
+}
+
+.status-badge {
+  padding: 0.3rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-badge.state-idle {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.state-running {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-badge.state-error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.state-paused {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.state-connected {
+  background: #d4edda;
+  color: #155724;
 }
 </style>

@@ -4,8 +4,6 @@
       <h1>Manual Control</h1>
       <p>Direct control of Scribit device positioning and pen selection</p>
 
-      <DeviceStatus />
-
       <div class="control-sections">
         <!-- Movement Control -->
         <div class="control-section">
@@ -84,6 +82,24 @@
         </div>
       </div>
 
+      <!-- Custom G-code -->
+      <div class="custom-gcode-section">
+        <h2>Custom G-code</h2>
+        <p class="section-description">Send raw G-code commands directly to the device</p>
+        <div class="custom-gcode-controls">
+          <textarea
+            v-model="customGcode"
+            placeholder="Enter G-code commands (one per line)&#10;Example:&#10;G91&#10;G1 X10 Y10 F1000"
+            :disabled="!connected"
+            class="gcode-textarea"
+            rows="6"
+          ></textarea>
+          <button class="btn btn-primary" @click="sendCustomGcode" :disabled="!connected || !customGcode.trim()">
+            Send G-code
+          </button>
+        </div>
+      </div>
+
       <div v-if="status" class="status-message" :class="statusType">
         {{ status }}
       </div>
@@ -97,11 +113,11 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import DeviceStatus from '../components/DeviceStatus.vue'
 
 const connected = ref(false)
 const moveDistance = ref(50)
 const turnDegrees = ref(72)
+const customGcode = ref('')
 const status = ref('')
 const statusType = ref('info')
 const lastCommand = ref('')
@@ -185,6 +201,15 @@ async function turnCounterClockwise() {
   const gcode = `G91\nG1 Z${degrees}`
   await sendGcode(gcode)
   status.value = `Cylinder turned ${degrees}° counter-clockwise`
+  statusType.value = 'success'
+}
+
+async function sendCustomGcode() {
+  const gcode = customGcode.value.trim()
+  if (!gcode) return
+
+  await sendGcode(gcode)
+  status.value = 'Custom G-code sent successfully'
   statusType.value = 'success'
 }
 
@@ -393,6 +418,55 @@ onUnmounted(() => {
   color: #e74c3c;
   font-size: 0.9em;
   font-weight: 600;
+}
+
+/* Custom G-code */
+.custom-gcode-section {
+  margin-top: 2rem;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.custom-gcode-section h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
+.custom-gcode-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.gcode-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: vertical;
+  background: white;
+  color: #2c3e50;
+}
+
+.gcode-textarea:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.gcode-textarea:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.gcode-textarea::placeholder {
+  color: #95a5a6;
+  font-style: italic;
 }
 
 /* Status and Last Command */

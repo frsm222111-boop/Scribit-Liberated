@@ -4,8 +4,6 @@
       <h1>Draw</h1>
       <p>Upload an SVG or use one of the provided samples to draw using your device</p>
 
-      <DeviceStatus />
-
       <div v-if="drawingState !== 'idle'" class="drawing-controls">
         <button class="btn btn-warning" @click="pauseDrawing" :disabled="pausedState === 'paused' || pausedState === 'pausing'">
           Pause
@@ -41,7 +39,7 @@
       <div v-if="svgContent" class="svg-preview-section">
         <div class="conversion-options">
           <h3>Scribit Configuration</h3>
-
+          <p>We need three measurements to configure the drawing properly. Measure these distances on your wall and enter them before you start drawing. Otherwise your drawing will look wonky.</p>
           <div class="diagram-container">
             <svg viewBox="0 0 800 600" class="scribit-diagram">
               <!-- Anchor distance line (drawn first, behind everything) -->
@@ -136,7 +134,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import ProgressBar from '../components/ProgressBar.vue'
-import DeviceStatus from '../components/DeviceStatus.vue'
 import { getSvgOptions, setSvgOptions } from '../utils/appState'
 
 const selectedFile = ref('')
