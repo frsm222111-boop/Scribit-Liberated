@@ -4,6 +4,7 @@
 
 #include "SIConfig.hpp"
 #include "ScribIt.hpp"
+#include "FirmwareVersion.h"
 
 void replyBadRequest(WiFiClient &client, const char *error, const uint8_t t_ID[6])
 {
@@ -296,8 +297,8 @@ void ScribIt::handleHTTPRequests()
         client.println("Content-Type: application/json");
         client.println("Access-Control-Allow-Origin: *");
         client.println();
-        client.printf("{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\"}\n",
-                      stateStr, pauseStr, m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5]);
+        client.printf("{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\"}\n",
+                      stateStr, pauseStr, m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5], FIRMWARE_VERSION);
     }
     else if (path == "/upload" && method == "POST")
     {

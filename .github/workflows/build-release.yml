@@ -23,6 +23,9 @@ jobs:
           cp -r ExtraFile/arduino-mqtt Firmware/ScribitESP/
           cp -r ExtraFile/StepperDriver Firmware/ScribitESP/
 
+      - name: Generate firmware version header
+        run: node scripts/generate-version.js
+
       - name: Build ESP32 firmware
         run: |
           docker compose -f docker/docker-compose.yml run --rm scribit-firmware \
