@@ -2,7 +2,7 @@
   <div id="app">
     <nav v-if="!isWelcomeScreen" class="navbar">
       <div class="navbar-brand">
-        <h1>UnBrickIt</h1>
+        <img :src="logo" alt="UnBrickIt" class="navbar-logo" />
         <span class="version-badge">v{{ guiVersion }}</span>
       </div>
       <div class="nav-links">
@@ -40,6 +40,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getDeviceId, setFirmwareVersion, getFirmwareVersion } from './utils/appState'
 import packageJson from '../../../package.json'
+import logo from './assets/unbrickit_logo.svg'
 
 const router = useRouter()
 const route = useRoute()
@@ -161,7 +162,7 @@ onUnmounted(() => {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #f5f5f5;
+  background: #e8e8e8;
 }
 
 #app {
@@ -171,13 +172,15 @@ body {
 }
 
 .navbar {
-  background: #2c3e50;
-  color: white;
+  background: white;
+  color: #2c3e50;
   padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 10;
 }
 
 .navbar-brand {
@@ -186,17 +189,18 @@ body {
   gap: 0.75rem;
 }
 
-.navbar h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
+.navbar-logo {
+  height: 2rem;
+  width: auto;
 }
 
 .version-badge {
-  background: rgba(255,255,255,0.2);
+  background: #e8e8e8;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 500;
+  color: #7f8c8d;
 }
 
 .nav-links {
@@ -205,16 +209,17 @@ body {
 }
 
 .nav-links a {
-  color: white;
+  color: #2c3e50;
   text-decoration: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
   transition: background 0.2s;
+  font-weight: 500;
 }
 
 .nav-links a:hover,
 .nav-links a.router-link-active {
-  background: rgba(255,255,255,0.1);
+  background: #f0f0f0;
 }
 
 .nav-links a.disabled {
@@ -330,10 +335,12 @@ body {
 
 /* Footer styles */
 .app-footer {
-  background: #2c3e50;
-  color: white;
+  background: white;
+  color: #2c3e50;
   padding: 0.75rem 2rem;
   box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 10;
 }
 
 .footer-content {
@@ -353,8 +360,8 @@ body {
 }
 
 .donate-link:hover {
-  background: rgba(243, 156, 18, 0.1);
-  color: #f1c40f;
+  background: #fff3e0;
+  color: #e67e22;
 }
 
 .connection-status {
@@ -362,6 +369,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
+  color: #2c3e50;
 }
 
 .wifi-icon {
@@ -379,6 +387,6 @@ body {
 .device-id {
   font-family: monospace;
   font-size: 0.85rem;
-  color: #ecf0f1;
+  color: #546e7a;
 }
 </style>

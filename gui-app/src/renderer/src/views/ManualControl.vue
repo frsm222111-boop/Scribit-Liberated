@@ -48,37 +48,36 @@
             <div class="control-group">
               <h3>Initialize</h3>
               <button class="btn btn-warning" @click="homeCylinder" :disabled="!connected">
-                Home Cylinder (G77)
+                Calibrate pen holder
               </button>
+              <p class="helper-text">This should bring your device to Pen 1 in up position. This is where you want to be before you start drawing</p>
             </div>
 
             <div class="control-group">
-              <h3>Pen Up/Down</h3>
-              <div class="button-row">
-                <button class="btn btn-success" @click="penUp" :disabled="!connected">
-                  Pen Up
-                </button>
-                <button class="btn btn-danger" @click="penDown" :disabled="!connected">
-                  Pen Down
-                </button>
+              <h3>Turn Cylinder</h3>
+                              <p>Use these controls to rotate the pen holder cylinder to select different pens. The arrows on the side rotate the pen holder cylinder clockwise and counter clockwise.</p>
+              <div class="turn-control">
+                <div class="turn-input-row">
+                  <button class="btn btn-secondary arc-btn" @click="turnCounterClockwise" :disabled="!connected" title="Counter-clockwise">
+                    ↺
+                  </button>
+                  <div class="input-with-unit">
+                    <input type="number" v-model.number="turnDegrees" min="1" step="1" />
+                    <span class="unit">degrees</span>
+                  </div>
+                  <button class="btn btn-secondary arc-btn" @click="turnClockwise" :disabled="!connected" title="Clockwise">
+                    ↻
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div class="control-group">
-              <h3>Select Pen</h3>
-              <div class="pen-buttons">
-                <button
-                  v-for="pen in pens"
-                  :key="pen.number"
-                  class="btn pen-btn"
-                  :class="{ 'active': currentPen === pen.number }"
-                  :style="{ borderColor: pen.color }"
-                  @click="selectPen(pen.number)"
-                  :disabled="!connected"
-                >
-                  <span class="pen-dot" :style="{ backgroundColor: pen.color }"></span>
-                  Pen {{ pen.number }}
-                </button>
+              <div class="cylinder-instructions">
+                <p>Clockwise motion will engage lowering mechanism at certain points, so always go counter-clockwise unless you want to lower the pen</p>
+                <p><strong>Key degrees:</strong></p>
+                <ul>
+                  <li><code>72°</code> degrees between pens</li>
+                  <li><code>30°</code> clockwise - Pen down</li>
+                  <li><code>30°</code> counter-clockwise - Pen up</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -102,17 +101,10 @@ import DeviceStatus from '../components/DeviceStatus.vue'
 
 const connected = ref(false)
 const moveDistance = ref(50)
-const currentPen = ref(1)
+const turnDegrees = ref(72)
 const status = ref('')
 const statusType = ref('info')
 const lastCommand = ref('')
-
-const pens = [
-  { number: 1, color: '#000000', name: 'Black' },
-  { number: 2, color: '#e74c3c', name: 'Red' },
-  { number: 3, color: '#3498db', name: 'Blue' },
-  { number: 4, color: '#27ae60', name: 'Green' }
-]
 
 let connectionPollInterval = null
 
@@ -159,16 +151,16 @@ async function moveDown() {
 }
 
 async function moveLeft() {
-  // Left = left string longer, right shorter
+  // Left = left string shorter, right longer
   const dist = moveDistance.value
-  const gcode = `G91\nG1 X${dist} Y${dist} F1000`
+  const gcode = `G91\nG1 X-${dist} Y-${dist} F1000`
   await sendGcode(gcode)
 }
 
 async function moveRight() {
-  // Right = left string shorter, right longer
+  // Right = left string longer, right shorter
   const dist = moveDistance.value
-  const gcode = `G91\nG1 X-${dist} Y-${dist} F1000`
+  const gcode = `G91\nG1 X${dist} Y${dist} F1000`
   await sendGcode(gcode)
 }
 
@@ -176,43 +168,23 @@ async function moveRight() {
 async function homeCylinder() {
   const gcode = `M17\nG77\nG90\nG1 Z160\nG91\nG1 Z-70`
   await sendGcode(gcode)
-  currentPen.value = 1
-  status.value = 'Pen cylinder homed, Pen 1 ready'
+  status.value = 'Pen cylinder calibrated, Pen 1 ready in up position'
   statusType.value = 'success'
 }
 
-async function penUp() {
-  const gcode = `G91\nG1 Z30`
+async function turnClockwise() {
+  const degrees = turnDegrees.value
+  const gcode = `G91\nG1 Z-${degrees}`
   await sendGcode(gcode)
+  status.value = `Cylinder turned ${degrees}° clockwise`
+  statusType.value = 'success'
 }
 
-async function penDown() {
-  const gcode = `G91\nG1 Z-30`
+async function turnCounterClockwise() {
+  const degrees = turnDegrees.value
+  const gcode = `G91\nG1 Z${degrees}`
   await sendGcode(gcode)
-}
-
-async function selectPen(penNumber) {
-  if (penNumber === currentPen.value) return
-
-  let gcode = 'G91\nG1 Z30\n' // Pen up first
-
-  const diff = penNumber - currentPen.value
-
-  if (diff === 3 || diff === -1) {
-    // Pen 4 -> Pen 1 (special case: two 72° rotations)
-    gcode += 'G1 Z72\nG1 Z72\nG1 Z60\nG1 Z-60'
-  } else {
-    // Normal rotation
-    const steps = diff > 0 ? diff : diff + 4
-    for (let i = 0; i < steps; i++) {
-      gcode += 'G1 Z72\n'
-    }
-    gcode += 'G1 Z60\nG1 Z-60'
-  }
-
-  await sendGcode(gcode)
-  currentPen.value = penNumber
-  status.value = `Switched to Pen ${penNumber} (${pens[penNumber - 1].name})`
+  status.value = `Cylinder turned ${degrees}° counter-clockwise`
   statusType.value = 'success'
 }
 
@@ -317,48 +289,110 @@ onUnmounted(() => {
   margin-bottom: 0.75rem;
 }
 
-.button-row {
+.helper-text {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.turn-control {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.button-row .btn {
+.turn-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.input-with-unit {
   flex: 1;
-}
-
-.pen-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.pen-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   background: white;
+  overflow: hidden;
+}
+
+.input-with-unit input {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  font-size: 1rem;
+  text-align: center;
+  min-width: 0;
+}
+
+.input-with-unit input:focus {
+  outline: none;
+}
+
+.input-with-unit .unit {
+  padding: 0.75rem;
+  padding-left: 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.input-with-unit:focus-within {
+  border-color: #3498db;
+}
+
+.arc-btn {
+  width: 50px;
+  height: 50px;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 2.5rem;
+  font-weight: bold;
+  transform: rotate(180deg);
+}
+
+.cylinder-instructions {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 4px;
+  border-left: 3px solid #3498db;
+}
+
+.cylinder-instructions p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
   color: #2c3e50;
-  border: 2px solid #ddd;
-  padding: 0.75rem 1rem;
-  transition: all 0.2s;
 }
 
-.pen-btn:hover:not(:disabled) {
-  background: #f8f9fa;
-  transform: translateY(-2px);
+.cylinder-instructions ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  list-style: none;
 }
 
-.pen-btn.active {
-  border-width: 3px;
+.cylinder-instructions li {
+  font-size: 0.85rem;
+  color: #546e7a;
+  margin: 0.25rem 0;
+  line-height: 1.4;
+}
+
+.cylinder-instructions code {
+  background: #ecf0f1;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-family: monospace;
+  color: #e74c3c;
+  font-size: 0.9em;
   font-weight: 600;
-  background: #f8f9fa;
-}
-
-.pen-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid rgba(0,0,0,0.2);
 }
 
 /* Status and Last Command */
