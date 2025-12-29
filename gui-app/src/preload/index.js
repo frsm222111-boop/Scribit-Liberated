@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, shell } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron')
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -35,5 +35,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkDeviceConnection: () => ipcRenderer.invoke('check-device-connection'),
 
   // External links
-  openExternal: (url) => shell.openExternal(url)
+  openExternal: (url) => ipcRenderer.invoke('open-external', url)
 })

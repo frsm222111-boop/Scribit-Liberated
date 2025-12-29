@@ -13,8 +13,8 @@
     </main>
     <footer class="app-footer">
       <div class="footer-content">
-        <a href="https://www.buymeacoffee.com/unbrickit" target="_blank" class="donate-link">
-          ☕ Buy Me a Coffee
+        <a href="#" @click.prevent="openDonationPage" class="donate-link">
+          ☕ make a donation if you like
         </a>
         <div class="connection-status">
           <!-- WiFi icon -->
@@ -66,6 +66,14 @@ function stopConnectionPolling() {
   if (connectionPollInterval) {
     clearInterval(connectionPollInterval)
     connectionPollInterval = null
+  }
+}
+
+async function openDonationPage() {
+  try {
+    await window.electronAPI.openExternal('https://ko-fi.com/robotkareem')
+  } catch (error) {
+    console.error('Error opening link:', error)
   }
 }
 

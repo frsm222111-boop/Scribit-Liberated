@@ -1,4 +1,4 @@
-const { ipcMain, dialog } = require('electron')
+const { ipcMain, dialog, shell } = require('electron')
 const { uploadAllFirmware } = require('./espota-runner')
 const { convertSvgToGcode } = require('./python-runner')
 const axios = require('axios')
@@ -281,6 +281,12 @@ function registerIpcHandlers() {
         samples: [] // Empty array if samples folder doesn't exist or has no files
       }
     }
+  })
+
+  // Open external URL
+  ipcMain.handle('open-external', async (event, url) => {
+    await shell.openExternal(url)
+    return { success: true }
   })
 }
 
