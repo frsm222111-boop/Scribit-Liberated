@@ -1,17 +1,20 @@
 <template>
   <div id="app">
-    <nav class="navbar">
-      <h1>UnBrickIt</h1>
+    <nav v-if="!isWelcomeScreen" class="navbar">
+      <div class="navbar-brand">
+        <h1>UnBrickIt</h1>
+        <span class="version-badge">v{{ guiVersion }}</span>
+      </div>
       <div class="nav-links">
-        <router-link to="/">Draw</router-link>
-        <router-link to="/manual">Manual Control</router-link>
-        <router-link to="/firmware">Firmware Upload</router-link>
+        <router-link to="/draw" :class="{ disabled: !tabsEnabled.draw }">Draw</router-link>
+        <router-link to="/manual" :class="{ disabled: !tabsEnabled.manual }">Manual Control</router-link>
+        <router-link to="/firmware">{{ firmwareTabTitle }}</router-link>
       </div>
     </nav>
-    <main class="main-content">
+    <main class="main-content" :class="{ 'no-nav': isWelcomeScreen }">
       <router-view />
     </main>
-    <footer class="app-footer">
+    <footer v-if="!isWelcomeScreen" class="app-footer">
       <div class="footer-content">
         <a href="#" @click.prevent="openDonationPage" class="donate-link">
           ☕ make a donation if you like
@@ -25,7 +28,7 @@
             <path fill="currentColor" d="M12,21 L15.6,16.2 C14.6,15.45 13.3,15 12,15 C10.7,15 9.4,15.45 8.4,16.2 L12,21 M12,3 C7.95,3 4.21,4.34 1.2,6.6 L3,9 C5.5,7.12 8.62,6 12,6 C15.38,6 18.5,7.12 21,9 L22.8,6.6 C19.79,4.34 16.05,3 12,3 M12,9 C9.3,9 6.81,9.89 4.8,11.4 L6.6,13.8 C8.1,12.67 9.97,12 12,12 C14.03,12 15.9,12.67 17.4,13.8 L19.2,11.4 C17.19,9.89 14.7,9 12,9 Z"/>
             <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2"/>
           </svg>
-          <span class="device-id">{{ deviceId || 'No device' }}</span>
+          <span class="device-id">{{ deviceId || 'No device' }}{{ firmwareVersion ? ` (v${firmwareVersion})` : '' }}</span>
         </div>
       </div>
     </footer>
@@ -33,27 +36,90 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { getDeviceId } from './utils/appState'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { getDeviceId, setFirmwareVersion, getFirmwareVersion } from './utils/appState'
+import packageJson from '../../../package.json'
 
+const router = useRouter()
+const route = useRoute()
 const connected = ref(false)
 const deviceId = ref(getDeviceId())
+const firmwareVersion = ref(getFirmwareVersion())
+const guiVersion = ref(packageJson.version)
 let connectionPollInterval = null
+
+// Check if we're on the welcome screen
+const isWelcomeScreen = computed(() => route.path === '/welcome' || route.path === '/')
+
+// Version comparison logic
+const tabsEnabled = computed(() => {
+  if (!firmwareVersion.value) {
+    // No firmware version = not set up yet
+    return { draw: false, manual: false }
+  }
+
+  const [major] = firmwareVersion.value.split('.').map(Number)
+  if (major >= 1) {
+    return { draw: true, manual: true }
+  }
+
+  return { draw: false, manual: false }
+})
+
+const firmwareTabTitle = computed(() => {
+  if (!firmwareVersion.value) {
+    return 'Firmware Upload'
+  }
+
+  if (compareVersions(guiVersion.value, firmwareVersion.value) > 0) {
+    return 'Update Firmware'
+  }
+
+  return 'Firmware Upload'
+})
+
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number)
+  const parts2 = v2.split('.').map(Number)
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0
+    const p2 = parts2[i] || 0
+
+    if (p1 > p2) return 1
+    if (p1 < p2) return -1
+  }
+
+  return 0
+}
 
 async function checkConnection() {
   try {
     const result = await window.electronAPI.checkDeviceConnection()
     connected.value = result.connected
 
-    // If connected, fetch device ID from status
+    // If connected, fetch device ID and version from status
     if (result.connected) {
       const statusResult = await window.electronAPI.getDeviceStatus()
-      if (statusResult.success && statusResult.data && statusResult.data.id) {
-        deviceId.value = statusResult.data.id
+      if (statusResult.success && statusResult.data) {
+        if (statusResult.data.id) {
+          deviceId.value = statusResult.data.id
+        }
+        if (statusResult.data.version) {
+          firmwareVersion.value = statusResult.data.version
+          setFirmwareVersion(statusResult.data.version)
+        }
       }
+    } else {
+      // Not connected - clear firmware version
+      firmwareVersion.value = null
+      setFirmwareVersion(null)
     }
   } catch (error) {
     connected.value = false
+    firmwareVersion.value = null
+    setFirmwareVersion(null)
   }
 }
 
@@ -114,9 +180,23 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .navbar h1 {
   font-size: 1.5rem;
   font-weight: 600;
+}
+
+.version-badge {
+  background: rgba(255,255,255,0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .nav-links {
@@ -137,10 +217,21 @@ body {
   background: rgba(255,255,255,0.1);
 }
 
+.nav-links a.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .main-content {
   flex: 1;
   overflow: auto;
   padding: 2rem;
+}
+
+.main-content.no-nav {
+  padding: 0;
+  height: 100vh;
 }
 
 /* Reusable button styles */

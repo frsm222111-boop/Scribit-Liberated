@@ -33,6 +33,20 @@ export function resetSetup() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+export function getFirmwareVersion() {
+  const state = localStorage.getItem(STORAGE_KEY)
+  return state ? JSON.parse(state).firmwareVersion : null
+}
+
+export function setFirmwareVersion(version) {
+  const state = localStorage.getItem(STORAGE_KEY)
+  const currentState = state ? JSON.parse(state) : {}
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...currentState,
+    firmwareVersion: version
+  }))
+}
+
 export function getSvgOptions() {
   const state = localStorage.getItem(STORAGE_KEY)
   if (state) {

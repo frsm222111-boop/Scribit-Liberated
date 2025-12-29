@@ -4,6 +4,11 @@
       <h1>Firmware Upload</h1>
       <p>Upload firmware to Scribit device via OTA</p>
 
+      <!-- Version status message -->
+      <div v-if="versionStatus" class="version-status" :class="versionStatus.type">
+        {{ versionStatus.message }}
+      </div>
+
       <div class="step" v-for="(step, idx) in steps" :key="idx" :class="{active: currentStep === idx}">
         <div class="step-header">
           <div class="step-content">
@@ -104,12 +109,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ProgressBar from '../components/ProgressBar.vue'
 import WifiPrompt from '../components/WifiPrompt.vue'
 import LedIndicator from '../components/LedIndicator.vue'
-import { markSetupComplete, setDeviceId } from '../utils/appState'
+import { markSetupComplete, setDeviceId, getFirmwareVersion } from '../utils/appState'
+import packageJson from '../../../../package.json'
 
 const router = useRouter()
 const currentStep = ref(0)
@@ -123,6 +129,50 @@ const step2Verified = ref(false)
 const reconnectVerified = ref(false)
 
 let networkCheckInterval = null
+
+// Version comparison
+const guiVersion = packageJson.version
+const versionStatus = computed(() => {
+  const firmwareVersion = getFirmwareVersion()
+
+  if (!firmwareVersion) {
+    return null // No version info yet
+  }
+
+  const comparison = compareVersions(guiVersion, firmwareVersion)
+
+  if (comparison === 0) {
+    return {
+      type: 'success',
+      message: `✓ You're up to date! (v${firmwareVersion})`
+    }
+  } else if (comparison > 0) {
+    return {
+      type: 'warning',
+      message: `Update available: v${firmwareVersion} → v${guiVersion}`
+    }
+  } else {
+    return {
+      type: 'info',
+      message: `Firmware: v${firmwareVersion} | GUI: v${guiVersion}`
+    }
+  }
+})
+
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number)
+  const parts2 = v2.split('.').map(Number)
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0
+    const p2 = parts2[i] || 0
+
+    if (p1 > p2) return 1
+    if (p1 < p2) return -1
+  }
+
+  return 0
+}
 
 const steps = [
   { title: 'Connect to ScribIt-.....', desc: 'Hold left side of the LED 5+ sec, device reboots. \nWhen back online connect to ScribIt-.... WiFi (password: ScribItAP314 if needed)' },
@@ -453,5 +503,31 @@ function getLedLabel(stepIndex) {
 .led-arrow {
   flex-shrink: 0;
   transform: translateX(110%) translateY(-10px);
+}
+
+.version-status {
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.version-status.success {
+  background: #d4edda;
+  color: #155724;
+  border: 2px solid #28a745;
+}
+
+.version-status.warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 2px solid #ffc107;
+}
+
+.version-status.info {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 2px solid #17a2b8;
 }
 </style>
