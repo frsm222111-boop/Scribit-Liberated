@@ -8,9 +8,13 @@ Desktop app for ScribIt firmware upload and G-code control.
 
 1. Download `.dmg` from [Releases](https://github.com/karimi/scrubit/releases)
 2. Open DMG, drag to Applications
-3. Open app from Applications
+3. **Remove quarantine flag** (required on first launch):
+   ```bash
+   xattr -d com.apple.quarantine /Applications/UnBrickIt.app
+   ```
+4. Open app from Applications
 
-The app is ad-hoc signed and ready to use.
+**Why?** The app is ad-hoc signed (not notarized with Apple Developer account). macOS Gatekeeper blocks unnotarized apps by default. The command above removes the quarantine flag so the app can launch.
 
 ### Windows
 
