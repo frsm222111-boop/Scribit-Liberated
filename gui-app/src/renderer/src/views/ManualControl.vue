@@ -100,6 +100,22 @@
         </div>
       </div>
 
+      <!-- Drawing Controls -->
+      <div v-if="drawingState !== 'idle'" class="drawing-controls">
+        <h3>Drawing Controls</h3>
+        <div class="drawing-controls-buttons">
+          <button class="btn btn-warning" @click="pauseDrawing" :disabled="pausedState === 'paused' || pausedState === 'pausing'">
+            Pause
+          </button>
+          <button class="btn btn-primary" @click="resumeDrawing" :disabled="pausedState === 'running'">
+            Resume
+          </button>
+          <button class="btn btn-danger" @click="stopDrawing" :disabled="drawingState === 'idle'">
+            Stop
+          </button>
+        </div>
+      </div>
+
       <div v-if="status" class="status-message" :class="statusType">
         {{ status }}
       </div>
@@ -121,8 +137,11 @@ const customGcode = ref('')
 const status = ref('')
 const statusType = ref('info')
 const lastCommand = ref('')
+const drawingState = ref('idle') // idle, drawing
+const pausedState = ref('running') // running, pausing, paused
 
 let connectionPollInterval = null
+let statusPollingInterval = null
 
 async function checkConnection() {
   try {
@@ -213,14 +232,97 @@ async function sendCustomGcode() {
   statusType.value = 'success'
 }
 
+async function checkDrawingStatus() {
+  try {
+    const result = await window.electronAPI.getDeviceStatus()
+    if (result.success && result.data) {
+      const state = result.data.state?.toLowerCase()
+      console.log('Device state:', state, 'Drawing state:', drawingState.value)
+
+      // Check if device is in any active drawing state
+      if (state && (state.includes('running') || state.includes('drawing') || state.includes('busy'))) {
+        drawingState.value = 'drawing'
+        pausedState.value = 'running'
+      } else if (state && state.includes('paused')) {
+        drawingState.value = 'drawing'
+        pausedState.value = 'paused'
+      } else if (state && (state === 'idle' || state === 'ready')) {
+        drawingState.value = 'idle'
+        pausedState.value = 'running'
+      }
+    }
+  } catch (error) {
+    console.error('Error checking drawing status:', error)
+  }
+}
+
+async function pauseDrawing() {
+  try {
+    pausedState.value = 'pausing'
+    const result = await window.electronAPI.pauseDrawing()
+    if (result.success) {
+      pausedState.value = 'paused'
+      status.value = 'Drawing paused'
+      statusType.value = 'info'
+    } else {
+      pausedState.value = 'running'
+      status.value = 'Failed to pause: ' + result.error
+      statusType.value = 'error'
+    }
+  } catch (error) {
+    pausedState.value = 'running'
+    status.value = 'Error pausing: ' + error.message
+    statusType.value = 'error'
+  }
+}
+
+async function resumeDrawing() {
+  try {
+    const result = await window.electronAPI.resumeDrawing()
+    if (result.success) {
+      pausedState.value = 'running'
+      status.value = 'Drawing resumed'
+      statusType.value = 'success'
+    } else {
+      status.value = 'Failed to resume: ' + result.error
+      statusType.value = 'error'
+    }
+  } catch (error) {
+    status.value = 'Error resuming: ' + error.message
+    statusType.value = 'error'
+  }
+}
+
+async function stopDrawing() {
+  try {
+    const result = await window.electronAPI.stopDrawing()
+    if (result.success) {
+      drawingState.value = 'idle'
+      pausedState.value = 'running'
+      status.value = 'Drawing stopped'
+      statusType.value = 'info'
+    } else {
+      status.value = 'Failed to stop: ' + result.error
+      statusType.value = 'error'
+    }
+  } catch (error) {
+    status.value = 'Error stopping: ' + error.message
+    statusType.value = 'error'
+  }
+}
+
 onMounted(() => {
   checkConnection()
   connectionPollInterval = setInterval(checkConnection, 3000)
+  statusPollingInterval = setInterval(checkDrawingStatus, 1000)
 })
 
 onUnmounted(() => {
   if (connectionPollInterval) {
     clearInterval(connectionPollInterval)
+  }
+  if (statusPollingInterval) {
+    clearInterval(statusPollingInterval)
   }
 })
 </script>
@@ -467,6 +569,28 @@ onUnmounted(() => {
 .gcode-textarea::placeholder {
   color: #95a5a6;
   font-style: italic;
+}
+
+/* Drawing Controls */
+.drawing-controls {
+  margin-top: 2rem;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.drawing-controls h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.drawing-controls-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
 }
 
 /* Status and Last Command */

@@ -4,18 +4,6 @@
       <h1>Draw</h1>
       <p>Upload an SVG or use one of the provided samples to draw using your device</p>
 
-      <div v-if="drawingState !== 'idle'" class="drawing-controls">
-        <button class="btn btn-warning" @click="pauseDrawing" :disabled="pausedState === 'paused' || pausedState === 'pausing'">
-          Pause
-        </button>
-        <button class="btn btn-primary" @click="resumeDrawing" :disabled="pausedState === 'running'">
-          Resume
-        </button>
-        <button class="btn btn-danger" @click="stopDrawing" :disabled="drawingState === 'idle'">
-          Stop
-        </button>
-      </div>
-
       <div class="file-selector">
         <button class="btn btn-primary" @click="selectFile">Select SVG File</button>
         <span v-if="selectedFile" class="file-name">{{ selectedFileName }}</span>
@@ -118,8 +106,19 @@
 
       <div v-if="selectedFile" class="actions">
         <button class="btn btn-success" @click="convertAndSend" :disabled="processing || drawingState !== 'idle'">
-          {{ processing ? 'Processing...' : 'Convert & Send to Device' }}
+          {{ processing ? 'Processing...' : 'Send' }}
         </button>
+        <div v-if="drawingState !== 'idle'" class="drawing-controls-group">
+          <button class="btn btn-warning" @click="pauseDrawing" :disabled="pausedState === 'paused' || pausedState === 'pausing'">
+            Pause
+          </button>
+          <button class="btn btn-primary" @click="resumeDrawing" :disabled="pausedState === 'running'">
+            Resume
+          </button>
+          <button class="btn btn-danger" @click="stopDrawing" :disabled="drawingState === 'idle'">
+            Stop
+          </button>
+        </div>
       </div>
 
       <div v-if="status" class="status-message" :class="statusType">
@@ -659,14 +658,16 @@ async function stopDrawing() {
 }
 
 .actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
   margin: 2rem 0;
 }
 
-.drawing-controls {
+.actions .drawing-controls-group {
   display: flex;
   gap: 1rem;
-  justify-content: center;
-  margin: 1.5rem 0 2rem 0;
 }
 
 .status-message {
