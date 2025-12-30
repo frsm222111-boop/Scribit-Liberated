@@ -104,8 +104,23 @@
         </div>
       </div>
 
+      <div v-if="selectedFile" class="pre-send-checks">
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="dimensionsConfirmed" />
+            I've confirmed that the dimensions above are correct
+          </label>
+        </div>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="calibrationConfirmed" />
+            I've confirmed that the pen holder is <a href="#" @click.prevent="showCalibrationDialog = true" class="calibration-link">calibrated</a>
+          </label>
+        </div>
+      </div>
+
       <div v-if="selectedFile" class="actions">
-        <button class="btn btn-success" @click="convertAndSend" :disabled="processing || drawingState !== 'idle'">
+        <button class="btn btn-success" @click="convertAndSend" :disabled="processing || drawingState !== 'idle' || !dimensionsConfirmed || !calibrationConfirmed">
           {{ processing ? 'Processing...' : 'Send' }}
         </button>
         <div v-if="drawingState !== 'idle'" class="drawing-controls-group">
@@ -133,14 +148,34 @@
       :showDontShowAgain="donationShowCount >= 2"
       @close="handleDonationClose"
     />
+
+    <!-- Calibration Dialog -->
+    <div v-if="showCalibrationDialog" class="modal-overlay" @click.self="showCalibrationDialog = false">
+      <div class="calibration-modal">
+        <div class="modal-header">
+          <h2>Pen Holder Calibration</h2>
+          <button class="close-btn" @click="showCalibrationDialog = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <img :src="penDiagram" alt="Pen Calibration Diagram" class="calibration-diagram" />
+          <p class="calibration-text">
+            Run the calibration in <a href="#" @click.prevent="goToManualControl" class="calibration-link">Manual Control</a> to ensure your pen holder is in the correct position (Pen 1 in up position) before starting a drawing.
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import ProgressBar from '../components/ProgressBar.vue'
 import DonationDialog from '../components/DonationDialog.vue'
 import { getSvgOptions, setSvgOptions, getDonationDialogState, incrementDonationShowCount, setDonationDontShowAgain } from '../utils/appState'
+import penDiagram from '../assets/pen_diagram.png'
+
+const router = useRouter()
 
 const selectedFile = ref('')
 const svgContent = ref('')
@@ -158,6 +193,11 @@ const showDonationDialog = ref(false)
 const donationDialogState = getDonationDialogState()
 const donationShowCount = ref(donationDialogState.showCount)
 let donationTimeout = null
+
+// Pre-send validation state
+const dimensionsConfirmed = ref(false)
+const calibrationConfirmed = ref(false)
+const showCalibrationDialog = ref(false)
 
 // Load saved options or use defaults
 const savedOptions = getSvgOptions()
@@ -500,6 +540,11 @@ function handleDonationClose(dontShowAgain) {
     setDonationDontShowAgain()
   }
 }
+
+function goToManualControl() {
+  showCalibrationDialog.value = false
+  router.push('/manual')
+}
 </script>
 
 <style scoped>
@@ -733,5 +778,122 @@ function handleDonationClose(dontShowAgain) {
 .status-message.error {
   background: #f8d7da;
   color: #721c24;
+}
+
+.pre-send-checks {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.checkbox-group {
+  margin: 0.75rem 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #2c3e50;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.calibration-link {
+  color: #3498db;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.calibration-link:hover {
+  color: #2980b9;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.calibration-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #7f8c8d;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: #f0f0f0;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.calibration-diagram {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  border-radius: 8px;
+}
+
+.calibration-text {
+  color: #546e7a;
+  line-height: 1.6;
+  text-align: center;
+  margin: 0;
 }
 </style>
