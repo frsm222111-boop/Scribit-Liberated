@@ -4,6 +4,55 @@
       <h1>Manual Control</h1>
       <p>Direct control of Scribit device positioning and pen selection</p>
 
+      <!-- Pen Control - Full Width -->
+      <div class="control-section pen-section-full">
+        <h2>Pen Control</h2>
+        <p class="section-description">Manage pen holder cylinder and pen selection</p>
+
+        <div class="pen-controls">
+          <div class="pen-init-row">
+            <div class="control-group">
+              <h3>Initialize</h3>
+              <button class="btn btn-warning" @click="homeCylinder" :disabled="!connected">
+                Calibrate pen holder
+              </button>
+            </div>
+            <div class="pen-diagram-column">
+              <img :src="penDiagram" alt="Pen Control Diagram" class="pen-diagram" />
+            </div>
+          </div>
+          <p class="helper-text">This is where you want to be before you start drawing, if your device isn't in this position, run the calibrate again.</p>
+
+          <div class="control-group">
+            <h3>Turn Cylinder</h3>
+                            <p>Use these controls to rotate the pen holder cylinder to select different pens. The arrows on the side rotate the pen holder cylinder clockwise and counter clockwise.</p>
+            <div class="turn-control">
+              <div class="turn-input-row">
+                <button class="btn btn-secondary arc-btn" @click="turnCounterClockwise" :disabled="!connected" title="Counter-clockwise">
+                  ↺
+                </button>
+                <div class="input-with-unit">
+                  <input type="number" v-model.number="turnDegrees" min="1" step="1" />
+                  <span class="unit">degrees</span>
+                </div>
+                <button class="btn btn-secondary arc-btn" @click="turnClockwise" :disabled="!connected" title="Clockwise">
+                  ↻
+                </button>
+              </div>
+            </div>
+            <div class="cylinder-instructions">
+              <p>Clockwise motion will engage lowering mechanism at certain points, so always go counter-clockwise unless you want to lower the pen</p>
+              <p><strong>Key degrees:</strong></p>
+              <ul>
+                <li><code>72°</code> degrees between pens</li>
+                <li><code>30°</code> clockwise - Pen down</li>
+                <li><code>30°</code> counter-clockwise - Pen up</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="control-sections">
         <!-- Movement Control -->
         <div class="control-section">
@@ -37,66 +86,22 @@
           </div>
         </div>
 
-        <!-- Pen Control -->
+        <!-- Custom G-code -->
         <div class="control-section">
-          <h2>Pen Control</h2>
-          <p class="section-description">Manage pen holder cylinder and pen selection</p>
-
-          <div class="pen-controls">
-            <div class="control-group">
-              <h3>Initialize</h3>
-              <button class="btn btn-warning" @click="homeCylinder" :disabled="!connected">
-                Calibrate pen holder
-              </button>
-              <p class="helper-text">This should bring your device to Pen 1 in up position. This is where you want to be before you start drawing</p>
-            </div>
-
-            <div class="control-group">
-              <h3>Turn Cylinder</h3>
-                              <p>Use these controls to rotate the pen holder cylinder to select different pens. The arrows on the side rotate the pen holder cylinder clockwise and counter clockwise.</p>
-              <div class="turn-control">
-                <div class="turn-input-row">
-                  <button class="btn btn-secondary arc-btn" @click="turnCounterClockwise" :disabled="!connected" title="Counter-clockwise">
-                    ↺
-                  </button>
-                  <div class="input-with-unit">
-                    <input type="number" v-model.number="turnDegrees" min="1" step="1" />
-                    <span class="unit">degrees</span>
-                  </div>
-                  <button class="btn btn-secondary arc-btn" @click="turnClockwise" :disabled="!connected" title="Clockwise">
-                    ↻
-                  </button>
-                </div>
-              </div>
-              <div class="cylinder-instructions">
-                <p>Clockwise motion will engage lowering mechanism at certain points, so always go counter-clockwise unless you want to lower the pen</p>
-                <p><strong>Key degrees:</strong></p>
-                <ul>
-                  <li><code>72°</code> degrees between pens</li>
-                  <li><code>30°</code> clockwise - Pen down</li>
-                  <li><code>30°</code> counter-clockwise - Pen up</li>
-                </ul>
-              </div>
-            </div>
+          <h2>Custom G-code</h2>
+          <p class="section-description">Send raw G-code commands directly to the device</p>
+          <div class="custom-gcode-controls">
+            <textarea
+              v-model="customGcode"
+              placeholder="Enter G-code commands (one per line)&#10;Example:&#10;G91&#10;G1 X10 Y10 F1000"
+              :disabled="!connected"
+              class="gcode-textarea"
+              rows="6"
+            ></textarea>
+            <button class="btn btn-primary" @click="sendCustomGcode" :disabled="!connected || !customGcode.trim()">
+              Send G-code
+            </button>
           </div>
-        </div>
-      </div>
-
-      <!-- Custom G-code -->
-      <div class="custom-gcode-section">
-        <h2>Custom G-code</h2>
-        <p class="section-description">Send raw G-code commands directly to the device</p>
-        <div class="custom-gcode-controls">
-          <textarea
-            v-model="customGcode"
-            placeholder="Enter G-code commands (one per line)&#10;Example:&#10;G91&#10;G1 X10 Y10 F1000"
-            :disabled="!connected"
-            class="gcode-textarea"
-            rows="6"
-          ></textarea>
-          <button class="btn btn-primary" @click="sendCustomGcode" :disabled="!connected || !customGcode.trim()">
-            Send G-code
-          </button>
         </div>
       </div>
 
@@ -129,6 +134,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import penDiagram from '../assets/pen_diagram.png'
 
 const connected = ref(false)
 const moveDistance = ref(50)
@@ -333,6 +339,20 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+.pen-section-full {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  margin-top: 2rem;
+}
+
+.pen-section-full h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
 .control-sections {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -408,6 +428,25 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.pen-init-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.pen-diagram-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pen-diagram {
+  width: 100%;
+  max-width: 200px;
+  height: auto;
 }
 
 .control-group h3 {
@@ -523,20 +562,6 @@ onUnmounted(() => {
 }
 
 /* Custom G-code */
-.custom-gcode-section {
-  margin-top: 2rem;
-  background: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
-.custom-gcode-section h2 {
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-  color: #2c3e50;
-}
-
 .custom-gcode-controls {
   display: flex;
   flex-direction: column;
@@ -635,6 +660,14 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .control-sections {
     grid-template-columns: 1fr;
+  }
+
+  .pen-init-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pen-diagram {
+    max-width: 200px;
   }
 }
 </style>

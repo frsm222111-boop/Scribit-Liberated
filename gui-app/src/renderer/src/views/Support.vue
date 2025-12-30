@@ -1,16 +1,19 @@
 <template>
   <div class="support-page">
     <div class="card support-card">
-      <div class="donation-icon">
-        ☕
-      </div>
-
       <h1>Support Development</h1>
 
       <p class="donation-message">
         If you're finding this app useful, please consider supporting its development.
-        Your donation helps keep the project alive and enables new features.
+        Your donation helps keep the project alive and enables new features such as.
       </p>
+
+      <ul class="support-benefits">
+        <li>iOS and Android app</li>
+        <li>Image and text drawing</li>
+        <li>Multi-color drawing</li>
+        <li>Automatic calibration</li>
+      </ul>
 
       <div class="qr-section">
         <p class="qr-instruction">Scan with your phone to donate:</p>
@@ -56,11 +59,6 @@ onMounted(async () => {
   padding: 3rem 2rem;
 }
 
-.donation-icon {
-  font-size: 5rem;
-  margin-bottom: 1.5rem;
-}
-
 .support-card h1 {
   font-size: 2rem;
   color: #2c3e50;
@@ -70,8 +68,43 @@ onMounted(async () => {
 .donation-message {
   color: #546e7a;
   line-height: 1.6;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   font-size: 1.1rem;
+}
+
+.support-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem 0;
+  text-align: left;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.support-benefits li {
+  color: #2c3e50;
+  padding: 0.5rem 0;
+  padding-left: 2rem;
+  position: relative;
+  font-size: 1rem;
+}
+
+.support-benefits li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0.6rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid #ddd;
+  border-radius: 3px;
+  background: white;
+  color: #bbb;
+  font-weight: bold;
+  font-size: 0.85rem;
+  text-align: center;
+  line-height: 1.1rem;
 }
 
 .qr-section {

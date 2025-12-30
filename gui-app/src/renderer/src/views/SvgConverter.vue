@@ -486,12 +486,12 @@ function scheduleDonationDialog() {
     clearTimeout(donationTimeout)
   }
 
-  // Show dialog after 10 seconds
+  // Show dialog after 5 seconds
   donationTimeout = setTimeout(() => {
     showDonationDialog.value = true
     incrementDonationShowCount()
     donationShowCount.value = getDonationDialogState().showCount
-  }, 10000)
+  }, 5000)
 }
 
 function handleDonationClose(dontShowAgain) {
