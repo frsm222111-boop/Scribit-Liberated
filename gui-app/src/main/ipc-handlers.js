@@ -3,15 +3,33 @@ const { uploadAllFirmware } = require('./espota-runner')
 const { convertSvgToGcode } = require('./python-runner')
 const axios = require('axios')
 
+// Device settings storage (synced from renderer localStorage)
+let deviceSettings = {
+  ipAddress: '192.168.240.1',
+  otaPort: 3232,
+  apiPort: 8888
+}
+
 /**
  * Register all IPC handlers
  */
 function registerIpcHandlers() {
-  // Check if device is reachable at 192.168.240.1:8888
+  // Get device settings
+  ipcMain.handle('get-device-settings', async () => {
+    return deviceSettings
+  })
+
+  // Set device settings
+  ipcMain.handle('set-device-settings', async (event, settings) => {
+    deviceSettings = { ...deviceSettings, ...settings }
+    return { success: true }
+  })
+
+  // Check if device is reachable
   // Any HTTP response (including 404) means we're connected
   ipcMain.handle('check-device-connection', async () => {
     try {
-      await axios.get('http://192.168.240.1:8888/', {
+      await axios.get(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}/`, {
         timeout: 2000,
         validateStatus: () => true // Accept any HTTP status code
       })
@@ -27,7 +45,8 @@ function registerIpcHandlers() {
     try {
       const result = await uploadAllFirmware(
         {
-          espIp: options.espIp || '192.168.240.1',
+          espIp: options.espIp || deviceSettings.ipAddress,
+          espPort: deviceSettings.otaPort,
           hostIp: options.hostIp,
           password: options.password
         },
@@ -55,9 +74,9 @@ function registerIpcHandlers() {
     try {
       const result = await uploadFirmware(
         {
-          espIp: options.espIp || '192.168.240.1',
+          espIp: options.espIp || deviceSettings.ipAddress,
           firmwareFile: options.firmwareFile,
-          espPort: 3232,
+          espPort: deviceSettings.otaPort,
           companion: options.companion || false,
           spiffs: options.spiffs || false,
           hostIp: options.hostIp,
@@ -82,7 +101,7 @@ function registerIpcHandlers() {
   // Send WiFi credentials to trigger OTA mode
   ipcMain.handle('send-wifi-credentials', async (event, credentials) => {
     try {
-      const response = await axios.post('http://192.168.240.1:8888', {
+      const response = await axios.post(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}`, {
         ssid: credentials.ssid,
         password: credentials.password
       }, {
@@ -101,7 +120,7 @@ function registerIpcHandlers() {
   // Get device status
   ipcMain.handle('get-device-status', async () => {
     try {
-      const response = await axios.get('http://192.168.240.1:8888/status', {
+      const response = await axios.get(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}/status`, {
         timeout: 5000
       })
       return { success: true, data: response.data }
@@ -116,7 +135,7 @@ function registerIpcHandlers() {
   // Send G-code to device
   ipcMain.handle('send-gcode', async (event, gcode) => {
     try {
-      const response = await axios.post('http://192.168.240.1:8888/upload', gcode, {
+      const response = await axios.post(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}/upload`, gcode, {
         headers: { 'Content-Type': 'text/plain' },
         timeout: 30000
       })
@@ -132,7 +151,7 @@ function registerIpcHandlers() {
   // Pause drawing
   ipcMain.handle('pause-drawing', async () => {
     try {
-      const response = await axios.post('http://192.168.240.1:8888/pause', {}, {
+      const response = await axios.post(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}/pause`, {}, {
         timeout: 5000
       })
       return { success: true, data: response.data }
@@ -147,7 +166,7 @@ function registerIpcHandlers() {
   // Resume drawing
   ipcMain.handle('resume-drawing', async () => {
     try {
-      const response = await axios.post('http://192.168.240.1:8888/resume', {}, {
+      const response = await axios.post(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}/resume`, {}, {
         timeout: 5000
       })
       return { success: true, data: response.data }
@@ -162,7 +181,7 @@ function registerIpcHandlers() {
   // Stop drawing
   ipcMain.handle('stop-drawing', async () => {
     try {
-      const response = await axios.post('http://192.168.240.1:8888/stop', {}, {
+      const response = await axios.post(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}/stop`, {}, {
         timeout: 5000
       })
       return { success: true, data: response.data }

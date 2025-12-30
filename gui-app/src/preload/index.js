@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendWifiCredentials: (credentials) => ipcRenderer.invoke('send-wifi-credentials', credentials),
   checkDeviceConnection: () => ipcRenderer.invoke('check-device-connection'),
 
+  // Device settings
+  getDeviceSettings: () => ipcRenderer.invoke('get-device-settings'),
+  setDeviceSettings: (settings) => ipcRenderer.invoke('set-device-settings', settings),
+
   // External links
   openExternal: (url) => ipcRenderer.invoke('open-external', url)
 })

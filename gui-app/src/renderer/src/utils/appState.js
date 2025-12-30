@@ -64,3 +64,29 @@ export function setSvgOptions(options) {
     svgOptions: options
   }))
 }
+
+export function getDeviceSettings() {
+  const state = localStorage.getItem(STORAGE_KEY)
+  if (state) {
+    const parsed = JSON.parse(state)
+    return parsed.deviceSettings || {
+      ipAddress: '192.168.240.1',
+      otaPort: 3232,
+      apiPort: 8888
+    }
+  }
+  return {
+    ipAddress: '192.168.240.1',
+    otaPort: 3232,
+    apiPort: 8888
+  }
+}
+
+export function setDeviceSettings(settings) {
+  const state = localStorage.getItem(STORAGE_KEY)
+  const currentState = state ? JSON.parse(state) : {}
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...currentState,
+    deviceSettings: settings
+  }))
+}
