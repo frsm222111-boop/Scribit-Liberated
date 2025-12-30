@@ -90,3 +90,46 @@ export function setDeviceSettings(settings) {
     deviceSettings: settings
   }))
 }
+
+export function getDonationDialogState() {
+  const state = localStorage.getItem(STORAGE_KEY)
+  if (state) {
+    const parsed = JSON.parse(state)
+    return parsed.donationDialog || {
+      showCount: 0,
+      dontShowAgain: false
+    }
+  }
+  return {
+    showCount: 0,
+    dontShowAgain: false
+  }
+}
+
+export function incrementDonationShowCount() {
+  const state = localStorage.getItem(STORAGE_KEY)
+  const currentState = state ? JSON.parse(state) : {}
+  const donationDialog = currentState.donationDialog || { showCount: 0, dontShowAgain: false }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...currentState,
+    donationDialog: {
+      ...donationDialog,
+      showCount: donationDialog.showCount + 1
+    }
+  }))
+}
+
+export function setDonationDontShowAgain() {
+  const state = localStorage.getItem(STORAGE_KEY)
+  const currentState = state ? JSON.parse(state) : {}
+  const donationDialog = currentState.donationDialog || { showCount: 0, dontShowAgain: false }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...currentState,
+    donationDialog: {
+      ...donationDialog,
+      dontShowAgain: true
+    }
+  }))
+}

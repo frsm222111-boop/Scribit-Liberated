@@ -127,13 +127,20 @@
 
       <ProgressBar v-if="processing" :progress="progress" />
     </div>
+
+    <DonationDialog
+      :isOpen="showDonationDialog"
+      :showDontShowAgain="donationShowCount >= 2"
+      @close="handleDonationClose"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import ProgressBar from '../components/ProgressBar.vue'
-import { getSvgOptions, setSvgOptions } from '../utils/appState'
+import DonationDialog from '../components/DonationDialog.vue'
+import { getSvgOptions, setSvgOptions, getDonationDialogState, incrementDonationShowCount, setDonationDontShowAgain } from '../utils/appState'
 
 const selectedFile = ref('')
 const svgContent = ref('')
@@ -145,6 +152,12 @@ const drawingState = ref('idle') // idle, drawing, paused
 const pausedState = ref('running') // running, pausing, paused
 const samples = ref([])
 let statusPollingInterval = null
+
+// Donation dialog state
+const showDonationDialog = ref(false)
+const donationDialogState = getDonationDialogState()
+const donationShowCount = ref(donationDialogState.showCount)
+let donationTimeout = null
 
 // Load saved options or use defaults
 const savedOptions = getSvgOptions()
@@ -393,6 +406,9 @@ async function convertAndSend() {
       drawingState.value = 'drawing'
       pausedState.value = 'running'
       startPolling()
+
+      // Schedule donation dialog to appear after 10 seconds
+      scheduleDonationDialog()
     } else {
       status.value = 'Failed to send to device: ' + sendResult.error
       statusType.value = 'error'
@@ -455,6 +471,33 @@ async function stopDrawing() {
   } catch (error) {
     status.value = 'Error stopping: ' + error.message
     statusType.value = 'error'
+  }
+}
+
+function scheduleDonationDialog() {
+  // Check if user has opted out
+  const dialogState = getDonationDialogState()
+  if (dialogState.dontShowAgain) {
+    return
+  }
+
+  // Clear any existing timeout
+  if (donationTimeout) {
+    clearTimeout(donationTimeout)
+  }
+
+  // Show dialog after 10 seconds
+  donationTimeout = setTimeout(() => {
+    showDonationDialog.value = true
+    incrementDonationShowCount()
+    donationShowCount.value = getDonationDialogState().showCount
+  }, 10000)
+}
+
+function handleDonationClose(dontShowAgain) {
+  showDonationDialog.value = false
+  if (dontShowAgain) {
+    setDonationDontShowAgain()
   }
 }
 </script>

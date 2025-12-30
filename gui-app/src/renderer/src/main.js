@@ -28,6 +28,11 @@ const router = createRouter({
       path: '/firmware',
       name: 'firmware',
       component: () => import('./views/FirmwareUpload.vue')
+    },
+    {
+      path: '/support',
+      name: 'support',
+      component: () => import('./views/Support.vue')
     }
   ]
 })
