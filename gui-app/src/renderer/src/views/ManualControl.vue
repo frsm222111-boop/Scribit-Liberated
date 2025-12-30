@@ -240,7 +240,7 @@ async function checkDrawingStatus() {
       console.log('Device state:', state, 'Drawing state:', drawingState.value)
 
       // Check if device is in any active drawing state
-      if (state && (state.includes('running') || state.includes('drawing') || state.includes('busy'))) {
+      if (state && (state.includes('running') || state.includes('drawing') || state.includes('busy') || state.includes('printing'))) {
         drawingState.value = 'drawing'
         pausedState.value = 'running'
       } else if (state && state.includes('paused')) {
