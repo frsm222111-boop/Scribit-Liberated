@@ -80,6 +80,10 @@
       {
         "from": "resources/scripts",
         "to": "scripts"
+      },
+      {
+        "from": "samples",
+        "to": "samples"
       }
     ]
   }
