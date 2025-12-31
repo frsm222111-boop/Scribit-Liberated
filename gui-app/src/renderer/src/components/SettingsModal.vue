@@ -39,8 +39,11 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="close">Cancel</button>
-        <button class="btn btn-primary" @click="save">Save</button>
+        <button class="btn btn-secondary" @click="revertToDefaults">Revert to Defaults</button>
+        <div class="footer-right">
+          <button class="btn btn-secondary" @click="close">Cancel</button>
+          <button class="btn btn-primary" @click="save">Save</button>
+        </div>
       </div>
     </div>
   </div>
@@ -56,11 +59,13 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save'])
 
-const localSettings = ref({
+const defaultSettings = {
   ipAddress: '192.168.240.1',
   otaPort: 3232,
   apiPort: 8888
-})
+}
+
+const localSettings = ref({ ...defaultSettings })
 
 // Load settings when modal opens
 watch(() => props.isOpen, (newValue) => {
@@ -78,6 +83,10 @@ function save() {
   setDeviceSettings(plainSettings)
   emit('save', plainSettings)
   close()
+}
+
+function revertToDefaults() {
+  localSettings.value = { ...defaultSettings }
 }
 </script>
 
@@ -176,9 +185,14 @@ function save() {
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
   padding: 1.5rem;
   border-top: 1px solid #e0e0e0;
+}
+
+.footer-right {
+  display: flex;
+  gap: 1rem;
 }
 </style>
