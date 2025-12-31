@@ -9,10 +9,12 @@
       </p>
 
       <ul class="support-benefits">
-        <li>iOS and Android app</li>
-        <li>Image and text drawing</li>
         <li>Multi-color drawing</li>
+        <li>Erasing drawings</li>
+        <li>Estimated time remaining</li>
+        <li>Image and text drawing</li>
         <li>Automatic calibration</li>
+        <li>iOS and Android app</li>
       </ul>
 
       <div class="qr-section">
@@ -82,9 +84,11 @@ onMounted(async () => {
   padding: 0;
   margin: 0 0 2rem 0;
   text-align: left;
-  max-width: 400px;
+  max-width: 500px;
   margin-left: auto;
   margin-right: auto;
+  columns: 2;
+  column-gap: 2rem;
 }
 
 .support-benefits li {
@@ -93,6 +97,7 @@ onMounted(async () => {
   padding-left: 2rem;
   position: relative;
   font-size: 1rem;
+  break-inside: avoid;
 }
 
 .support-benefits li::before {

@@ -38,8 +38,8 @@
               <line x1="750" y1="100" :x2="devicePosition.x" :y2="devicePosition.y" stroke="#9b59b6" stroke-width="4"/>
 
               <!-- SVG Drawing Overlay (scaled to actual size) -->
-              <g v-if="svgContent" opacity="0.6" :transform="`translate(${devicePosition.x}, ${devicePosition.y}) scale(${diagramScale})`">
-                <foreignObject x="-400" y="-300" width="800" height="600">
+              <g v-if="svgContent" opacity="0.85" :transform="`translate(${devicePosition.x}, ${devicePosition.y}) scale(${diagramScale})`">
+                <foreignObject x="-1000" y="-1000" width="2000" height="2000" overflow="visible">
                   <div
                     xmlns="http://www.w3.org/1999/xhtml"
                     class="svg-overlay"
@@ -165,7 +165,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import ProgressBar from '../components/ProgressBar.vue'
 import DonationDialog from '../components/DonationDialog.vue'
@@ -236,6 +236,23 @@ const diagramScale = computed(() => {
   // Scale SVG to match actual anchor distance
   const baseScale = 700 / options.value.anchorDistance
   return baseScale * options.value.scale
+})
+
+const compensatedStrokeWidth = computed(() => {
+  // Compensate for the ENTIRE diagram scale to keep stroke width at 2.5px visually
+  const diagramScaleVal = diagramScale.value
+  const strokeWidth = diagramScaleVal === 0 ? 2.5 : (2.5 / diagramScaleVal)
+  return strokeWidth
+})
+
+// Update stroke widths in SVG preview when scale changes
+watch([svgContent, compensatedStrokeWidth], async () => {
+  await nextTick()
+  const overlayElements = document.querySelectorAll('.svg-overlay path, .svg-overlay line, .svg-overlay polyline, .svg-overlay polygon, .svg-overlay circle, .svg-overlay ellipse, .svg-overlay rect')
+  const strokeWidth = compensatedStrokeWidth.value
+  overlayElements.forEach(el => {
+    el.style.strokeWidth = strokeWidth
+  })
 })
 
 // Check if configuration is valid
@@ -624,6 +641,25 @@ function goToManualControl() {
   justify-content: center;
   align-items: center;
   pointer-events: none;
+}
+
+.svg-overlay svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+}
+
+/* Override all stroke widths in preview for uniform thickness */
+/* Note: stroke widths are now set via JavaScript watcher for proper reactivity */
+.svg-overlay path,
+.svg-overlay line,
+.svg-overlay polyline,
+.svg-overlay polygon,
+.svg-overlay circle,
+.svg-overlay ellipse,
+.svg-overlay rect {
+  /* Stroke width set dynamically via JS */
 }
 
 .diagram-input {
