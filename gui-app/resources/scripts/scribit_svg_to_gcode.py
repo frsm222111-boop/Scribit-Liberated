@@ -75,15 +75,80 @@ def get_color_pen(color_str):
 
     return color_map.get(color_str.lower(), 1)
 
+def get_svg_scale_factor(root):
+    """
+    Calculate scale factor from SVG viewBox and physical dimensions.
+
+    Returns:
+        Scale factor to convert SVG units to mm
+    """
+    # Standard unit conversions to mm
+    unit_to_mm = {
+        'pt': 0.3527777778,  # points: 1pt = 1/72 inch
+        'px': 0.2645833333,  # pixels: 1px = 1/96 inch
+        'mm': 1.0,
+        'cm': 10.0,
+        'in': 25.4,
+    }
+
+    # Get viewBox
+    viewbox = root.get('viewBox')
+    if not viewbox:
+        return 1.0  # No viewBox, assume 1:1
+
+    viewbox_parts = viewbox.split()
+    if len(viewbox_parts) != 4:
+        return 1.0
+
+    vb_width = float(viewbox_parts[2])
+    vb_height = float(viewbox_parts[3])
+
+    # Get physical width/height with units
+    width_str = root.get('width', '')
+    height_str = root.get('height', '')
+
+    # Parse width
+    physical_width_mm = None
+    if width_str:
+        # Extract number and unit
+        import re
+        match = re.match(r'([\d.]+)(\w*)', width_str.strip())
+        if match:
+            value = float(match.group(1))
+            unit = match.group(2) or 'px'  # Default to px if no unit
+            physical_width_mm = value * unit_to_mm.get(unit, 1.0)
+
+    # Parse height
+    physical_height_mm = None
+    if height_str:
+        match = re.match(r'([\d.]+)(\w*)', height_str.strip())
+        if match:
+            value = float(match.group(1))
+            unit = match.group(2) or 'px'
+            physical_height_mm = value * unit_to_mm.get(unit, 1.0)
+
+    # Calculate scale factor (use width, fallback to height)
+    if physical_width_mm and vb_width > 0:
+        return physical_width_mm / vb_width
+    elif physical_height_mm and vb_height > 0:
+        return physical_height_mm / vb_height
+
+    return 1.0  # Default to 1:1 if can't determine
+
 def parse_svg_paths(svg_file):
     """
     Parse SVG file and extract path elements with color info.
 
     Returns:
-        List of (path_d, pen_number) tuples
+        Tuple of (paths, svg_scale_factor) where:
+        - paths: List of (path_d, pen_number) tuples
+        - svg_scale_factor: Scale factor to convert SVG units to mm
     """
     tree = ET.parse(svg_file)
     root = tree.getroot()
+
+    # Get SVG unit scale factor
+    svg_scale_factor = get_svg_scale_factor(root)
 
     # Handle SVG namespace
     ns = {'svg': 'http://www.w3.org/2000/svg'}
@@ -136,7 +201,7 @@ def parse_svg_paths(svg_file):
                 pen = get_color_pen(color)
                 paths.append((d, pen))
 
-    return paths
+    return paths, svg_scale_factor
 
 def bezier_point(t, points):
     """Calculate point on Bezier curve at parameter t (0 to 1)."""
@@ -210,7 +275,7 @@ def svg_arc_to_center(x1, y1, x2, y2, rx, ry, phi, fa, fs):
 
     return cx, cy, rx, ry, theta1, dtheta
 
-def parse_path_to_points(path_data, resolution=5.0):
+def parse_path_to_points(path_data, resolution=5.0, svg_scale_factor=1.0):
     """
     Parse SVG path data into list of (x, y) points.
 
@@ -219,6 +284,7 @@ def parse_path_to_points(path_data, resolution=5.0):
     Args:
         path_data: SVG path 'd' attribute string
         resolution: Maximum distance between points (mm)
+        svg_scale_factor: Scale factor to convert SVG units to mm
 
     Returns:
         List of (x, y, pen_down) tuples where pen_down is bool
@@ -229,6 +295,9 @@ def parse_path_to_points(path_data, resolution=5.0):
     last_control_x, last_control_y = None, None  # For S and T commands
 
     # Simple command parsing
+    # Insert spaces before command letters to handle paths like "21L873"
+    import re
+    path_data = re.sub(r'([MmLlHhVvCcSsQqTtAaZz])', r' \1 ', path_data)
     commands = path_data.replace(',', ' ').split()
     i = 0
 
@@ -474,9 +543,14 @@ def parse_path_to_points(path_data, resolution=5.0):
             # Skip unsupported commands
             i += 1
 
+    # Apply SVG unit scale factor to all coordinates
+    if svg_scale_factor != 1.0:
+        points = [(x * svg_scale_factor, y * svg_scale_factor, pen_down)
+                  for x, y, pen_down in points]
+
     return points
 
-def optimize_path_order(paths, anchor_distance, left_length, right_length):
+def optimize_path_order(paths, anchor_distance, left_length, right_length, svg_scale_factor=1.0):
     """
     Optimize order of paths to minimize travel distance.
     Uses greedy nearest-neighbor algorithm.
@@ -484,6 +558,7 @@ def optimize_path_order(paths, anchor_distance, left_length, right_length):
     Args:
         paths: List of (path_data, pen_number) tuples
         anchor_distance, left_length, right_length: Starting position
+        svg_scale_factor: Scale factor to convert SVG units to mm
 
     Returns:
         Optimized list of (path_data, pen_number) tuples
@@ -497,7 +572,7 @@ def optimize_path_order(paths, anchor_distance, left_length, right_length):
     # Extract first point of each path
     path_starts = []
     for path_data, pen_num in paths:
-        points = parse_path_to_points(path_data)
+        points = parse_path_to_points(path_data, svg_scale_factor=svg_scale_factor)
         if points:
             path_starts.append((points[0][0], points[0][1], path_data, pen_num))
 
@@ -546,14 +621,17 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
         List of G-code lines
     """
     # Parse SVG paths
-    paths = parse_svg_paths(svg_file)
+    paths, svg_scale_factor = parse_svg_paths(svg_file)
 
     if not paths:
         raise ValueError(f"No paths found in {svg_file}")
 
+    # Combine SVG unit scale with user scale
+    total_scale = svg_scale_factor * scale
+
     # Optimize path order if requested
     if optimize:
-        paths = optimize_path_order(paths, anchor_distance, left_length, right_length)
+        paths = optimize_path_order(paths, anchor_distance, left_length, right_length, svg_scale_factor)
 
     # Calculate starting position (center of drawing)
     start_x, start_y = calculate_position(anchor_distance, left_length, right_length)
@@ -569,6 +647,23 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
     current_R = right_length
     pen_z_relative = 0  # Track relative Z position (0 = up, -30 = down)
     current_pen = 1
+
+    # Calculate global bounding box for ALL paths to center the entire drawing
+    all_points = []
+    for path_data, _ in paths:
+        points = parse_path_to_points(path_data, svg_scale_factor=svg_scale_factor)
+        all_points.extend(points)
+
+    if all_points:
+        svg_min_x = min(p[0] for p in all_points)
+        svg_max_x = max(p[0] for p in all_points)
+        svg_min_y = min(p[1] for p in all_points)
+        svg_max_y = max(p[1] for p in all_points)
+        svg_center_x = (svg_min_x + svg_max_x) / 2
+        svg_center_y = (svg_min_y + svg_max_y) / 2
+    else:
+        svg_center_x = 0
+        svg_center_y = 0
 
     # Process each path
     for path_data, pen_number in paths:
@@ -604,16 +699,7 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             current_pen = pen_number
             pen_z_relative = 0  # After switch, always at pen up
 
-        points = parse_path_to_points(path_data)
-
-        # Find SVG bounding box to center the drawing
-        if points:
-            svg_min_x = min(p[0] for p in points)
-            svg_max_x = max(p[0] for p in points)
-            svg_min_y = min(p[1] for p in points)
-            svg_max_y = max(p[1] for p in points)
-            svg_center_x = (svg_min_x + svg_max_x) / 2
-            svg_center_y = (svg_min_y + svg_max_y) / 2
+        points = parse_path_to_points(path_data, svg_scale_factor=svg_scale_factor)
 
         for svg_x, svg_y, pen_down in points:
             # Handle pen up/down (CORRECTED METHOD)
@@ -628,8 +714,8 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
             # Calibrated compensation: 28mm/50mm measured → 0.893x, 40mm/50mm → 1.25x
-            relative_x = (svg_x - svg_center_x) * scale * 0.893
-            relative_y = (svg_y - svg_center_y) * scale * 1.25
+            relative_x = (svg_x - svg_center_x) * total_scale * 0.893
+            relative_y = (svg_y - svg_center_y) * total_scale * 1.25
 
             # Calculate absolute position on wall
             target_x = start_x + relative_x + offset_x
