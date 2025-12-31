@@ -20,6 +20,11 @@
         <canvas ref="qrCanvas" class="qr-code"></canvas>
         <p class="qr-url">ko-fi.com/robotkareem</p>
       </div>
+
+      <div class="contact-section">
+        <p class="contact-text">Questions or feedback?</p>
+        <a href="mailto:hello@unbrickit.com" class="email-link">hello@unbrickit.com</a>
+      </div>
     </div>
   </div>
 </template>
@@ -136,5 +141,31 @@ onMounted(async () => {
   font-family: monospace;
   margin: 0;
   font-weight: 500;
+}
+
+.contact-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #ddd;
+  text-align: center;
+}
+
+.contact-text {
+  color: #546e7a;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.email-link {
+  color: #3498db;
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.email-link:hover {
+  color: #2980b9;
+  text-decoration: underline;
 }
 </style>

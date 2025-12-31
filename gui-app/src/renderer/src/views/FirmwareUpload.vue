@@ -9,51 +9,53 @@
         {{ versionStatus.message }}
       </div>
 
-      <div class="step" v-for="(step, idx) in steps" :key="idx" :class="{active: currentStep === idx}">
+      <div class="step" v-for="(step, idx) in steps" :key="step.id" :class="{active: currentStep === idx}">
         <div class="step-header">
           <div class="step-content">
-            <h3>Step {{ idx + 1 }}{{ idx === 3 && currentStep === 3 ? `.${currentSubstep + 1}` : '' }}: {{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].title : step.title }}</h3>
-            <p>{{ idx === 3 && currentStep === 3 ? substeps[currentSubstep].desc : step.desc }}</p>
+            <h3>Step {{ idx + 1 }}{{ step.id === 3 && currentStep === idx ? `.${currentSubstep + 1}` : '' }}: {{ step.id === 3 && currentStep === idx ? substeps[currentSubstep].title : step.title }}</h3>
+            <p>{{ step.id === 3 && currentStep === idx ? substeps[currentSubstep].desc : step.desc }}</p>
           </div>
-          <div v-if="idx !== 3 && currentStep === idx" class="led-container">
+          <div v-if="step.id !== 3 && currentStep === idx" class="led-container">
             <!-- Arrow pointing down to left of LED (only for step 1) -->
-            <svg v-if="idx === 0" class="led-arrow" viewBox="0 0 40 60" width="40" height="60">
+            <svg v-if="step.id === 0" class="led-arrow" viewBox="0 0 40 60" width="40" height="60">
               <path d="M 20 10 L 20 40" stroke="#3498db" stroke-width="3" fill="none" />
               <path d="M 10 30 L 20 40 L 30 30" stroke="#3498db" stroke-width="3" fill="none" stroke-linejoin="round" />
             </svg>
-            <LedIndicator :mode="getLedMode(idx)" :label="getLedLabel(idx)" />
+            <LedIndicator :mode="getLedMode(step.id)" :label="getLedLabel(step.id)" />
           </div>
         </div>
 
         <!-- Step 0: Verify ScribIt network -->
-        <div v-if="idx === 0 && currentStep === 0">
+        <div v-if="step.id === 0 && currentStep === idx">
           <div class="verification-status" :class="networkStatus.type">
             {{ networkStatus.message }}
           </div>
           <button class="btn btn-primary" @click="nextStep" :disabled="!step0Verified">
             {{ step0Verified ? 'Continue' : 'Waiting for connection...' }}
           </button>
+          <button class="btn btn-secondary" @click="nextStep" style="margin-left: 1rem;">Skip</button>
         </div>
 
         <!-- Step 1: WiFi credentials -->
-        <div v-if="idx === 1 && currentStep === 1">
+        <div v-if="step.id === 1 && currentStep === idx">
           <WifiPrompt @submit="sendWifi" />
-          <button class="btn btn-secondary" @click="skipStep2" style="margin-top: 1rem;">Skip (Debug)</button>
+          <button class="btn btn-secondary" @click="skipStep2" style="margin-top: 1rem;">Skip</button>
           <div v-if="status" class="verification-status info" style="margin-top: 1rem;">{{ status }}</div>
         </div>
 
         <!-- Step 2: Verify MBC-WB network -->
-        <div v-if="idx === 2 && currentStep === 2">
+        <div v-if="step.id === 2 && currentStep === idx">
           <div class="verification-status" :class="networkStatus.type">
             {{ networkStatus.message }}
           </div>
           <button class="btn btn-primary" @click="nextStep" :disabled="!step2Verified">
             {{ step2Verified ? 'Continue' : 'Waiting for connection...' }}
           </button>
+          <button class="btn btn-secondary" @click="nextStep" style="margin-left: 1rem;">Skip</button>
         </div>
 
         <!-- Step 3: Upload firmware with substeps -->
-        <div v-if="idx === 3 && currentStep === 3">
+        <div v-if="step.id === 3 && currentStep === idx">
           <!-- Substep 0: Upload ESP32 firmware -->
           <div v-if="currentSubstep === 0">
             <button v-if="!uploading" class="btn btn-success" @click="uploadESP32">Upload ESP32 Firmware</button>
@@ -174,20 +176,75 @@ function compareVersions(v1, v2) {
   return 0
 }
 
-const steps = [
-  { title: 'Connect to ScribIt-.....', desc: 'Hold left side of the LED 5+ sec, device reboots. \nWhen back online connect to ScribIt-.... WiFi (password: ScribItAP314 if needed)' },
-  { title: 'Send WiFi Credentials', desc: 'Enter your home WiFi credentials to trigger OTA mode' },
-  { title: 'Connect to MBC-WB-.....', desc: 'A new WiFi network named MBC-WB-..... should appear. Connect to it' },
-  { title: 'Upload Firmware', desc: 'Upload firmware files in sequence' }
-]
+// Filter steps based on firmware version
+const steps = computed(() => {
+  const firmwareVersion = getFirmwareVersion()
 
-const substeps = [
-  { title: 'Upload ESP32 Firmware', desc: 'Upload main ESP32 firmware' },
-  { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
-  { title: 'Upload SAMD21 Firmware', desc: 'Upload companion chip firmware' },
-  { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
-  { title: 'Upload ESP32 Partitions', desc: 'Upload final partition data' }
-]
+  if (!firmwareVersion) {
+    // No version info - show all steps
+    return [
+      { id: 0, title: 'Connect to ScribIt-.....', desc: 'Hold left side of the LED 5+ sec, device reboots. \nWhen back online connect to ScribIt-.... WiFi (password: ScribItAP314 if needed)' },
+      { id: 1, title: 'Send WiFi Credentials', desc: 'Enter your home WiFi credentials to trigger OTA mode' },
+      { id: 2, title: 'Connect to MBC-WB-.....', desc: 'A new WiFi network named MBC-WB-..... should appear. Connect to it' },
+      { id: 3, title: 'Upload Firmware', desc: 'Upload firmware files in sequence' }
+    ]
+  }
+
+  const [major] = firmwareVersion.split('.').map(Number)
+
+  if (major >= 1) {
+    // Firmware >= 1.0 - only show connect and upload steps
+    return [
+      { id: 0, title: 'Connect to ScribIt-.....', desc: 'Connect to ScribIt-.... WiFi (password: ScribItAP314 if needed)' },
+      { id: 3, title: 'Upload Firmware', desc: 'Upload firmware files in sequence' }
+    ]
+  }
+
+  // Firmware < 1.0 - show all steps
+  return [
+    { id: 0, title: 'Connect to ScribIt-.....', desc: 'Hold left side of the LED 5+ sec, device reboots. \nWhen back online connect to ScribIt-.... WiFi (password: ScribItAP314 if needed)' },
+    { id: 1, title: 'Send WiFi Credentials', desc: 'Enter your home WiFi credentials to trigger OTA mode' },
+    { id: 2, title: 'Connect to MBC-WB-.....', desc: 'A new WiFi network named MBC-WB-..... should appear. Connect to it' },
+    { id: 3, title: 'Upload Firmware', desc: 'Upload firmware files in sequence' }
+  ]
+})
+
+const substeps = computed(() => {
+  const firmwareVersion = getFirmwareVersion()
+
+  if (!firmwareVersion) {
+    // No version info - use MBC-WB flow
+    return [
+      { title: 'Upload ESP32 Firmware', desc: 'Upload main ESP32 firmware' },
+      { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
+      { title: 'Upload SAMD21 Firmware', desc: 'Upload companion chip firmware' },
+      { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
+      { title: 'Upload ESP32 Partitions', desc: 'Upload final partition data' }
+    ]
+  }
+
+  const [major] = firmwareVersion.split('.').map(Number)
+
+  if (major >= 1) {
+    // Firmware >= 1.0 - stay on ScribIt network
+    return [
+      { title: 'Upload ESP32 Firmware', desc: 'Upload main ESP32 firmware' },
+      { title: 'Reconnect to ScribIt', desc: 'Device will reboot. Reconnect to ScribIt-... WiFi' },
+      { title: 'Upload SAMD21 Firmware', desc: 'Upload companion chip firmware' },
+      { title: 'Reconnect to ScribIt', desc: 'Device will reboot. Reconnect to ScribIt-... WiFi' },
+      { title: 'Upload ESP32 Partitions', desc: 'Upload final partition data' }
+    ]
+  }
+
+  // Firmware < 1.0 - use MBC-WB flow
+  return [
+    { title: 'Upload ESP32 Firmware', desc: 'Upload main ESP32 firmware' },
+    { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
+    { title: 'Upload SAMD21 Firmware', desc: 'Upload companion chip firmware' },
+    { title: 'Reconnect to MBC-WB', desc: 'Device will reboot. Reconnect to MBC-WB WiFi' },
+    { title: 'Upload ESP32 Partitions', desc: 'Upload final partition data' }
+  ]
+})
 
 async function checkNetwork() {
   const result = await window.electronAPI.checkDeviceConnection()
@@ -197,8 +254,11 @@ async function checkNetwork() {
     return
   }
 
+  const currentStepData = steps.value[currentStep.value]
+  if (!currentStepData) return
+
   // Step 0: Check for ScribIt network (device at 192.168.240.1:8888)
-  if (currentStep.value === 0) {
+  if (currentStepData.id === 0) {
     if (result.connected) {
       networkStatus.value = { type: 'success', message: '✓ Device reachable at http://192.168.240.1:8888/' }
       step0Verified.value = true
@@ -209,7 +269,7 @@ async function checkNetwork() {
   }
 
   // Step 2: Check for MBC-WB network (same endpoint)
-  if (currentStep.value === 2) {
+  if (currentStepData.id === 2) {
     if (result.connected) {
       networkStatus.value = { type: 'success', message: '✓ Device reachable at http://192.168.240.1:8888/' }
       step2Verified.value = true
@@ -220,7 +280,7 @@ async function checkNetwork() {
   }
 
   // Step 3 substeps: Reconnect verification (substeps 1 and 3)
-  if (currentStep.value === 3 && (currentSubstep.value === 1 || currentSubstep.value === 3)) {
+  if (currentStepData.id === 3 && (currentSubstep.value === 1 || currentSubstep.value === 3)) {
     if (result.connected) {
       networkStatus.value = { type: 'success', message: '✓ Device reconnected at http://192.168.240.1:8888/' }
       reconnectVerified.value = true
@@ -243,8 +303,9 @@ function stopNetworkCheck() {
   }
 }
 
-watch(currentStep, (newStep) => {
-  if (newStep === 0 || newStep === 2) {
+watch(currentStep, (newStepIndex) => {
+  const stepData = steps.value[newStepIndex]
+  if (stepData && (stepData.id === 0 || stepData.id === 2)) {
     startNetworkCheck()
   } else {
     stopNetworkCheck()
@@ -252,10 +313,11 @@ watch(currentStep, (newStep) => {
 })
 
 watch(currentSubstep, (newSubstep) => {
-  if (currentStep.value === 3 && (newSubstep === 1 || newSubstep === 3)) {
+  const stepData = steps.value[currentStep.value]
+  if (stepData && stepData.id === 3 && (newSubstep === 1 || newSubstep === 3)) {
     reconnectVerified.value = false
     startNetworkCheck()
-  } else if (currentStep.value === 3) {
+  } else if (stepData && stepData.id === 3) {
     stopNetworkCheck()
   }
 })
@@ -281,7 +343,7 @@ onUnmounted(() => {
 })
 
 function nextStep() {
-  if (currentStep.value < 3) {
+  if (currentStep.value < steps.value.length - 1) {
     currentStep.value++
   }
 }

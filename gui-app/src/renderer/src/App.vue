@@ -22,9 +22,12 @@
     </main>
     <footer v-if="!isWelcomeScreen" class="app-footer">
       <div class="footer-content">
-        <a href="#" @click.prevent="openWebsite" class="website-link">
-          www.unbrickit.com
-        </a>
+        <div class="footer-left">
+          <a href="#" @click.prevent="openWebsite" class="website-link">
+            www.unbrickit.com
+          </a>
+          <span class="update-hint">← check for updates</span>
+        </div>
         <div class="connection-status">
           <!-- WiFi icon -->
           <svg v-if="connected" class="wifi-icon connected" viewBox="0 0 24 24" width="20" height="20">
@@ -406,6 +409,12 @@ body {
   gap: 2rem;
 }
 
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .website-link {
   color: #3498db;
   text-decoration: none;
@@ -417,6 +426,12 @@ body {
 .website-link:hover {
   color: #2980b9;
   text-decoration: underline;
+}
+
+.update-hint {
+  color: #7f8c8d;
+  font-size: 0.85rem;
+  font-style: italic;
 }
 
 .connection-status {

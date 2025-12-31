@@ -47,9 +47,14 @@
         </ol>
       </div>
 
-      <button v-if="connectionStatus.type === 'success'" class="btn btn-primary" @click="handleContinue">
-        Continue
-      </button>
+      <div class="button-group">
+        <button v-if="connectionStatus.type === 'success'" class="btn btn-primary" @click="handleContinue">
+          Continue
+        </button>
+        <button class="btn btn-secondary" @click="handleSkip">
+          Skip
+        </button>
+      </div>
     </div>
 
     <SettingsModal :isOpen="showSettings" @close="showSettings = false" @save="handleSettingsSave" />
@@ -133,6 +138,10 @@ function handleContinue() {
     // Firmware < 1.0 - go to firmware upload
     router.push('/firmware')
   }
+}
+
+function handleSkip() {
+  router.push('/firmware')
 }
 
 async function handleSettingsSave(settings) {
@@ -297,6 +306,14 @@ onUnmounted(() => {
 .instructions .note {
   font-size: 0.9rem;
   font-style: italic;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
 }
 
 .btn {
