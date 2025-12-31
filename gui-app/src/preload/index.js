@@ -17,7 +17,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Drawing control
   pauseDrawing: () => ipcRenderer.invoke('pause-drawing'),
   resumeDrawing: () => ipcRenderer.invoke('resume-drawing'),
-  stopDrawing: () => ipcRenderer.invoke('stop-drawing'),
 
   // SVG to G-code conversion
   convertSvg: (svgPath) => ipcRenderer.invoke('convert-svg', svgPath),

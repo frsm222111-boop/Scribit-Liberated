@@ -332,6 +332,8 @@ curl -X POST http://192.168.240.1:8888/resume
 
 #### POST /stop
 
+**Note: Not yet implemented - planned for future release**
+
 Stop current operation and return home.
 
 ```bash

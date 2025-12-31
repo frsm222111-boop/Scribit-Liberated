@@ -178,21 +178,6 @@ function registerIpcHandlers() {
     }
   })
 
-  // Stop drawing
-  ipcMain.handle('stop-drawing', async () => {
-    try {
-      const response = await axios.post(`http://${deviceSettings.ipAddress}:${deviceSettings.apiPort}/stop`, {}, {
-        timeout: 5000
-      })
-      return { success: true, data: response.data }
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      }
-    }
-  })
-
   // SVG to G-code conversion
   ipcMain.handle('convert-svg', async (event, options) => {
     const os = require('os')

@@ -130,9 +130,6 @@
           <button class="btn btn-primary" @click="resumeDrawing" :disabled="pausedState === 'running'">
             Resume
           </button>
-          <button class="btn btn-danger" @click="stopDrawing" :disabled="drawingState === 'idle'">
-            Stop
-          </button>
         </div>
       </div>
 
@@ -492,25 +489,6 @@ async function resumeDrawing() {
     status.value = 'Error resuming: ' + error.message
     statusType.value = 'error'
     pausedState.value = 'paused' // Revert on error
-  }
-}
-
-async function stopDrawing() {
-  try {
-    const result = await window.electronAPI.stopDrawing()
-    if (result.success) {
-      drawingState.value = 'idle'
-      pausedState.value = 'running'
-      stopPolling()
-      status.value = 'Drawing stopped'
-      statusType.value = 'info'
-    } else {
-      status.value = 'Failed to stop: ' + result.error
-      statusType.value = 'error'
-    }
-  } catch (error) {
-    status.value = 'Error stopping: ' + error.message
-    statusType.value = 'error'
   }
 }
 
