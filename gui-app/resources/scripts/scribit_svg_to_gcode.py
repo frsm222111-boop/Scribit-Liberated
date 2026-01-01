@@ -747,13 +747,22 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
                 pen_z_relative = 0
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
-            # No compensation needed - gondola width correction handles geometry
             relative_x = (svg_x - svg_center_x) * total_scale
             relative_y = (svg_y - svg_center_y) * total_scale
 
-            # Calculate absolute position on wall
+            # Calculate absolute position on wall (before correction)
             target_x = start_x + relative_x + offset_x
-            target_y = start_y + relative_y + offset_y
+            target_y_uncorrected = start_y + relative_y + offset_y
+
+            # Empirical position-dependent correction for Y
+            # Measurements show: closer to anchors (lower Y) → 0.94, further (higher Y) → 0.99
+            # Linear interpolation based on Y position from anchor line
+            y_correction = 0.94 + (target_y_uncorrected / 1000.0) * 0.05
+            y_correction = max(0.94, min(1.03, y_correction))  # Clamp to reasonable range
+
+            # Apply correction by scaling the relative movement
+            relative_y_corrected = relative_y / y_correction
+            target_y = start_y + relative_y_corrected + offset_y
 
             # Calculate string lengths
             target_L, target_R = calculate_string_lengths(anchor_distance, target_x, target_y, gondola_width, gondola_height_offset)
