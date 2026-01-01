@@ -49,16 +49,46 @@ import argparse
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-def calculate_position(anchor_distance, left_length, right_length):
-    """Calculate (x, y) position from string lengths."""
-    x = (left_length**2 - right_length**2 + anchor_distance**2) / (2 * anchor_distance)
-    y = math.sqrt(left_length**2 - x**2)
+def calculate_position(anchor_distance, left_length, right_length, gondola_width=105, gondola_height_offset=52.5):
+    """Calculate (x, y) position from string lengths, accounting for gondola geometry.
+
+    Gondola is 105mm × 105mm box. Strings attach at upper corners.
+    - Left string attaches at (x - 52.5, y + 52.5) - upper left corner
+    - Right string attaches at (x + 52.5, y + 52.5) - upper right corner
+
+    Returns (x, y) of gondola CENTER.
+    """
+    w = gondola_width / 2
+    h = gondola_height_offset
+    a = anchor_distance
+
+    # Solve for x coordinate of gondola center
+    # Derived from: left_length² = (x-w)² + (y+h)² and right_length² = (a-x-w)² + (y+h)²
+    x = (a*a - 2*a*w + left_length**2 - right_length**2) / (2*(a - 2*w))
+
+    # Solve for y coordinate of gondola center
+    # From: left_length² = (x-w)² + (y+h)²
+    # => (y+h)² = left_length² - (x-w)²
+    # => y = sqrt(left_length² - (x-w)²) - h
+    y = math.sqrt(left_length**2 - (x - w)**2) - h
+
     return x, y
 
-def calculate_string_lengths(anchor_distance, x, y):
-    """Calculate required string lengths for Cartesian position (x, y)."""
-    left_length = math.sqrt(x**2 + y**2)
-    right_length = math.sqrt((anchor_distance - x)**2 + y**2)
+def calculate_string_lengths(anchor_distance, x, y, gondola_width=105, gondola_height_offset=52.5):
+    """Calculate required string lengths for Cartesian position (x, y), accounting for gondola geometry.
+
+    x, y is the gondola CENTER position.
+    Gondola is 105mm × 105mm box. Strings attach at upper corners (±52.5mm, +52.5mm from center).
+    """
+    w = gondola_width / 2
+    h = gondola_height_offset
+
+    # Left string attaches at (x - w, y + h)
+    left_length = math.sqrt((x - w)**2 + (y + h)**2)
+
+    # Right string attaches at (x + w, y + h)
+    right_length = math.sqrt((anchor_distance - x - w)**2 + (y + h)**2)
+
     return left_length, right_length
 
 def get_color_pen(color_str):
@@ -550,7 +580,7 @@ def parse_path_to_points(path_data, resolution=5.0, svg_scale_factor=1.0):
 
     return points
 
-def optimize_path_order(paths, anchor_distance, left_length, right_length, svg_scale_factor=1.0):
+def optimize_path_order(paths, anchor_distance, left_length, right_length, svg_scale_factor=1.0, gondola_width=105, gondola_height_offset=52.5):
     """
     Optimize order of paths to minimize travel distance.
     Uses greedy nearest-neighbor algorithm.
@@ -559,6 +589,8 @@ def optimize_path_order(paths, anchor_distance, left_length, right_length, svg_s
         paths: List of (path_data, pen_number) tuples
         anchor_distance, left_length, right_length: Starting position
         svg_scale_factor: Scale factor to convert SVG units to mm
+        gondola_width: Width of gondola in mm (default: 105)
+        gondola_height_offset: Height offset of string attachment (default: 52.5)
 
     Returns:
         Optimized list of (path_data, pen_number) tuples
@@ -567,7 +599,7 @@ def optimize_path_order(paths, anchor_distance, left_length, right_length, svg_s
         return paths
 
     # Get starting position
-    start_x, start_y = calculate_position(anchor_distance, left_length, right_length)
+    start_x, start_y = calculate_position(anchor_distance, left_length, right_length, gondola_width, gondola_height_offset)
 
     # Extract first point of each path
     path_starts = []
@@ -600,7 +632,7 @@ def optimize_path_order(paths, anchor_distance, left_length, right_length, svg_s
     return optimized
 
 def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
-                 scale=1.0, offset_x=0.0, offset_y=0.0, optimize=True):
+                 scale=1.0, offset_x=0.0, offset_y=0.0, optimize=True, gondola_width=105, gondola_height_offset=52.5):
     """
     Convert SVG to G-code.
 
@@ -616,6 +648,8 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
         offset_x: X offset to add to all SVG points (mm)
         offset_y: Y offset to add to all SVG points (mm)
         optimize: Whether to optimize path order (default: True)
+        gondola_width: Width of gondola in mm (default: 105)
+        gondola_height_offset: Height offset of string attachment (default: 52.5)
 
     Returns:
         List of G-code lines
@@ -631,10 +665,10 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
 
     # Optimize path order if requested
     if optimize:
-        paths = optimize_path_order(paths, anchor_distance, left_length, right_length, svg_scale_factor)
+        paths = optimize_path_order(paths, anchor_distance, left_length, right_length, svg_scale_factor, gondola_width, gondola_height_offset)
 
     # Calculate starting position (center of drawing)
-    start_x, start_y = calculate_position(anchor_distance, left_length, right_length)
+    start_x, start_y = calculate_position(anchor_distance, left_length, right_length, gondola_width, gondola_height_offset)
 
     # Assumes already homed and at pen1 up (G77, G90, Z160, G91, Z-70 done separately)
     gcode_lines = [
@@ -713,16 +747,16 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
                 pen_z_relative = 0
             # Center the SVG, apply scale and offset
             # Translate SVG coords to be centered at (0,0), then apply transformations
-            # Calibrated compensation: 28mm/50mm measured → 0.893x, 40mm/50mm → 1.25x
-            relative_x = (svg_x - svg_center_x) * total_scale * 0.893
-            relative_y = (svg_y - svg_center_y) * total_scale * 1.25
+            # No compensation needed - gondola width correction handles geometry
+            relative_x = (svg_x - svg_center_x) * total_scale
+            relative_y = (svg_y - svg_center_y) * total_scale
 
             # Calculate absolute position on wall
             target_x = start_x + relative_x + offset_x
             target_y = start_y + relative_y + offset_y
 
             # Calculate string lengths
-            target_L, target_R = calculate_string_lengths(anchor_distance, target_x, target_y)
+            target_L, target_R = calculate_string_lengths(anchor_distance, target_x, target_y, gondola_width, gondola_height_offset)
 
             delta_L = target_L - current_L
             delta_R = target_R - current_R
@@ -765,6 +799,10 @@ def main():
                         help='X offset in mm (default: 0)')
     parser.add_argument('--offset-y', type=float, default=0.0,
                         help='Y offset in mm (default: 0)')
+    parser.add_argument('--gondola-width', type=float, default=105.0,
+                        help='Gondola width in mm (default: 105)')
+    parser.add_argument('--gondola-height-offset', type=float, default=52.5,
+                        help='Height offset of string attachment points in mm (default: 52.5)')
     parser.add_argument('--output', '-o', type=str, default='gcode/svg_output.gcode',
                         help='Output file (default: gcode/svg_output.gcode)')
     parser.add_argument('--no-optimize', action='store_true',
@@ -779,12 +817,14 @@ def main():
         return 1
 
     # Calculate starting position
-    start_x, start_y = calculate_position(args.anchor_distance, args.left_length, args.right_length)
+    start_x, start_y = calculate_position(args.anchor_distance, args.left_length, args.right_length, args.gondola_width, args.gondola_height_offset)
 
     if not args.quiet:
         print(f"Converting: {args.svg_file}")
         print(f"Starting position: x={start_x:.2f}mm, y={start_y:.2f}mm")
         print(f"Starting strings: L={args.left_length:.2f}mm, R={args.right_length:.2f}mm")
+        print(f"Gondola width: {args.gondola_width:.2f}mm")
+        print(f"Gondola height offset: {args.gondola_height_offset:.2f}mm")
         print(f"Scale: {args.scale}x, Offset: ({args.offset_x}, {args.offset_y})")
 
     try:
@@ -796,7 +836,9 @@ def main():
             args.scale,
             args.offset_x,
             args.offset_y,
-            optimize=not args.no_optimize
+            optimize=not args.no_optimize,
+            gondola_width=args.gondola_width,
+            gondola_height_offset=args.gondola_height_offset
         )
 
         if not args.quiet:
