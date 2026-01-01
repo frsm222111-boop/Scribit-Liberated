@@ -30,6 +30,19 @@
           <p>We need three measurements to configure the drawing properly. Measure these distances on your wall and enter them before you start drawing. Otherwise your drawing will look wonky.</p>
           <div class="diagram-container">
             <svg viewBox="0 0 800 600" class="scribit-diagram">
+              <!-- Grid lines (100mm spacing) -->
+              <g opacity="0.2">
+                <template v-for="i in gridLinesVertical" :key="'v-' + i">
+                  <line :x1="50 + i * gridSpacing" y1="100" :x2="50 + i * gridSpacing" y2="500" stroke="#95a5a6" stroke-width="1"/>
+                </template>
+                <template v-for="i in gridLinesHorizontal" :key="'h-' + i">
+                  <line x1="50" :y1="100 + i * gridSpacing" x2="750" :y2="100 + i * gridSpacing" stroke="#95a5a6" stroke-width="1"/>
+                </template>
+              </g>
+
+              <!-- Grid cell size caption (top right) -->
+              <text x="750" y="85" font-size="11" fill="#7f8c8d" text-anchor="end" opacity="0.6">Grid: 100mm × 100mm</text>
+
               <!-- Anchor distance line (drawn first, behind everything) -->
               <line x1="50" y1="100" x2="750" y2="100" stroke="#3498db" stroke-width="3" stroke-dasharray="10,10"/>
 
@@ -176,6 +189,10 @@ const router = useRouter()
 
 const selectedFile = ref('')
 const svgContent = ref('')
+const svgPhysicalWidth = ref(null) // Physical width in mm
+const svgPhysicalHeight = ref(null) // Physical height in mm
+const svgViewBoxWidth = ref(null) // ViewBox width in units
+const svgViewBoxHeight = ref(null) // ViewBox height in units
 const processing = ref(false)
 const progress = ref(0)
 const status = ref('')
@@ -233,8 +250,20 @@ const selectedFileName = computed(() => {
 
 const diagramScale = computed(() => {
   // Diagram anchor distance is 700 units (from x=50 to x=750)
-  // Scale SVG to match actual anchor distance
+  // baseScale converts mm to diagram units
   const baseScale = 700 / options.value.anchorDistance
+
+  // If we have physical dimensions and viewBox, scale based on actual physical size
+  if (svgPhysicalWidth.value && svgViewBoxWidth.value) {
+    // Calculate how many mm each viewBox unit represents
+    const mmPerViewBoxUnit = svgPhysicalWidth.value / svgViewBoxWidth.value
+
+    // Scale to convert viewBox units → mm → diagram units
+    // Each viewBox unit = mmPerViewBoxUnit mm = (mmPerViewBoxUnit * baseScale) diagram units
+    return baseScale * mmPerViewBoxUnit * options.value.scale
+  }
+
+  // Fallback to old behavior if no physical dimensions
   return baseScale * options.value.scale
 })
 
@@ -322,6 +351,26 @@ const rightStringInputPos = computed(() => {
   }
 })
 
+// Grid lines for measurement reference (100mm spacing)
+const gridSpacing = computed(() => {
+  // Diagram is 700 units wide (x=50 to x=750) representing anchor distance
+  // Calculate units per 100mm
+  return (700 / options.value.anchorDistance) * 100
+})
+
+const gridLinesVertical = computed(() => {
+  // How many 100mm segments fit in the anchor distance
+  const count = Math.floor(options.value.anchorDistance / 100)
+  return Array.from({ length: count }, (_, i) => i + 1)
+})
+
+const gridLinesHorizontal = computed(() => {
+  // Show grid lines down to 400 diagram units (~400mm at similar scale)
+  const maxY = 400
+  const count = Math.floor(maxY / gridSpacing.value)
+  return Array.from({ length: count }, (_, i) => i + 1)
+})
+
 async function selectFile() {
   const result = await window.electronAPI.selectFile({
     filters: [
@@ -340,7 +389,44 @@ async function loadSvgContent(filePath) {
   try {
     const result = await window.electronAPI.readFile(filePath)
     if (result.success) {
-      svgContent.value = result.content
+      // Parse physical dimensions from original SVG (before stripping units)
+      const unitToMm = { mm: 1, cm: 10, in: 25.4, pt: 0.3528, px: 0.2646 }
+
+      const widthMatch = result.content.match(/width="([\d.]+)(mm|cm|in|pt|px)"/)
+      if (widthMatch) {
+        const value = parseFloat(widthMatch[1])
+        const unit = widthMatch[2]
+        svgPhysicalWidth.value = value * (unitToMm[unit] || 1)
+      } else {
+        svgPhysicalWidth.value = null
+      }
+
+      const heightMatch = result.content.match(/height="([\d.]+)(mm|cm|in|pt|px)"/)
+      if (heightMatch) {
+        const value = parseFloat(heightMatch[1])
+        const unit = heightMatch[2]
+        svgPhysicalHeight.value = value * (unitToMm[unit] || 1)
+      } else {
+        svgPhysicalHeight.value = null
+      }
+
+      // Parse viewBox to understand coordinate system
+      const viewBoxMatch = result.content.match(/viewBox="[\d.\s]+ [\d.\s]+ ([\d.]+) ([\d.]+)"/)
+      if (viewBoxMatch) {
+        svgViewBoxWidth.value = parseFloat(viewBoxMatch[1])
+        svgViewBoxHeight.value = parseFloat(viewBoxMatch[2])
+      } else {
+        svgViewBoxWidth.value = null
+        svgViewBoxHeight.value = null
+      }
+
+      // Strip units (mm, cm, in, pt, px) from width/height for preview display
+      // This prevents SVGs with physical units from appearing incorrectly sized in browser
+      // The actual conversion still uses the original file with units
+      let content = result.content
+      content = content.replace(/width="([\d.]+)(mm|cm|in|pt|px)"/g, 'width="$1"')
+      content = content.replace(/height="([\d.]+)(mm|cm|in|pt|px)"/g, 'height="$1"')
+      svgContent.value = content
       status.value = ''
     } else {
       status.value = 'Error reading file: ' + result.error
