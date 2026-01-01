@@ -79,15 +79,34 @@ def calculate_string_lengths(anchor_distance, x, y, gondola_width=105, gondola_h
 
     x, y is the gondola CENTER position.
     Gondola is 105mm × 105mm box. Strings attach at upper corners (±52.5mm, +52.5mm from center).
+
+    Accounts for string angle effects: horizontal offset has less impact when strings are steep.
     """
-    w = gondola_width / 2
+    w_base = gondola_width / 2
     h = gondola_height_offset
 
-    # Left string attaches at (x - w, y + h)
-    left_length = math.sqrt((x - w)**2 + (y + h)**2)
+    # Calculate approximate string angles to center point first
+    # This helps us estimate how much the horizontal offset matters
+    dist_to_left_anchor = math.sqrt(x**2 + (y + h)**2)
+    dist_to_right_anchor = math.sqrt((anchor_distance - x)**2 + (y + h)**2)
 
-    # Right string attaches at (x + w, y + h)
-    right_length = math.sqrt((anchor_distance - x - w)**2 + (y + h)**2)
+    # Angle from vertical (0 = straight down from anchor)
+    # When angle is small (steep string), horizontal offset matters less
+    left_angle = math.atan2(x, y + h) if (y + h) > 0 else 0
+    right_angle = math.atan2(anchor_distance - x, y + h) if (y + h) > 0 else 0
+
+    # Effective horizontal offset reduces when strings are steep
+    # At 0° (vertical): w_eff = 0, At 45°: w_eff = w_base, At 90° (horizontal): w_eff = w_base
+    # Using sin(angle) to scale: steep strings reduce offset
+    left_w_eff = w_base * abs(math.sin(left_angle))
+    right_w_eff = w_base * abs(math.sin(right_angle))
+
+    # Use symmetric reduction for simplicity
+    w_eff = (left_w_eff + right_w_eff) / 2
+
+    # Calculate string lengths with angle-adjusted offsets
+    left_length = math.sqrt((x - w_eff)**2 + (y + h)**2)
+    right_length = math.sqrt((anchor_distance - x - w_eff)**2 + (y + h)**2)
 
     return left_length, right_length
 
