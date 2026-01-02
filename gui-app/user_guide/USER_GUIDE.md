@@ -53,9 +53,7 @@ UnBrickIt is a desktop application that helps you:
 
 **Why is this step needed?**
 
-macOS has a security feature called **Gatekeeper** that blocks apps from developers who haven't paid Apple for a yearly Developer Account ($99/year). Since this is a free, open-source project, the app isn't registered with Apple. This doesn't mean the app is unsafe - it just means we haven't paid Apple's fee.
-
-You can verify the app is safe by checking the [source code on GitHub](https://github.com/karimi/scrubit).
+macOS has a security feature called **Gatekeeper** that blocks apps from developers who haven't paid Apple for a yearly Developer Account ($99/year). Since this is a hobby project, the app isn't registered with Apple. This doesn't mean the app is unsafe - it just means I haven't paid Apple's fee.
 
 **To allow the app to run:**
 
@@ -110,9 +108,7 @@ You can verify the app is safe by checking the [source code on GitHub](https://g
 
 **Why is this step needed?**
 
-Windows SmartScreen blocks apps from developers who haven't purchased a code-signing certificate (costs $300-500/year). Since this is a free, open-source project, the app isn't signed with an expensive certificate. This doesn't mean the app is unsafe - it just means we haven't paid for the certificate.
-
-You can verify the app is safe by checking the [source code on GitHub](https://github.com/karimi/scrubit).
+Windows SmartScreen blocks apps from developers who haven't purchased a code-signing certificate (costs $300-500/year). Since this is a hobby project, the app isn't registered with Apple. This doesn't mean the app is unsafe - it just means I haven't paid for the certificate.
 
 **To continue installation:**
 
@@ -152,26 +148,23 @@ Before you can use the app, you need to connect it to your ScribIt device over W
 
 ### Connecting to Your Device
 
-#### Step 1: Make Sure Your Device is On
+#### Step 1: Make Sure Your Device is On and hanging from the wall
 
 1. Plug in your ScribIt robot
 2. Wait for it to boot up (about 10-15 seconds)
-3. Make sure your computer and the robot are on the same WiFi network
 
 ![Device powered on](images/device-on.png)
 
-#### Step 2: Enter Device Information
+#### Step 2: Open the UnBrickIt app
 
-1. In the app, enter your device's **IP address**
-   - To find the IP address, check your router's connected devices
-   - Or use the device's display screen if it has one
-2. Click **Connect**
+1. The welcome screen appears
 
-![Connection settings](images/connection-settings.png)
+![Welcom screen](images/welcome.png)
 
-#### Step 3: Test Connection
+#### Step 3: Connect to you ScribIt Wi-Fi
 
-Once connected, you'll see a green indicator and the device status.
+1. On your computer look for a Wi-Fi network named `ScribIt-.....`
+2. Connect to it (this will disconnect you from the internet, that's OK)
 
 ![Connected successfully](images/connected.png)
 
@@ -179,29 +172,38 @@ Once connected, you'll see a green indicator and the device status.
 
 ### Uploading Firmware
 
-Firmware is the software that runs on your ScribIt robot. Updating it can add new features and fix bugs.
+The first step to get your ScribIt working is to update the firmware. Firmware is the software that runs on your ScribIt robot. The original firmware depends on web services such as www.scribit.design that's not working anymore. We're replacing the firmware with a new version that bypasses this step and ways for us to controll it from the app.
 
 **When to update firmware:**
-- When a new version is released
+
+- The first time you install UnBrickIt
+- When a new version of UnBrickIt is released
 - If your robot is behaving unexpectedly
-- After first assembly
 
-#### Step 1: Go to Firmware Upload
+#### Go to Firmware Upload
 
-Click the **Firmware Upload** tab in the app.
+Click the **Firmware Upload** tab in the app and follow the steps.
 
 ![Firmware tab](images/firmware-tab.png)
 
-#### Step 2: Select Firmware Files
+#### Step 1: Connect to ScribIt-..... Wi-Fi network
 
-The app comes with the latest firmware built-in. You'll see two firmware files:
+The left side of the LED on your device is a button, Hold it down for 5+ sec, device reboots. When back online connect to ScribIt-.... WiFi (password: `ScribItAP314` if needed)
 
-- **ESP32 Firmware** - Controls WiFi and communication
-- **SAMD21 Firmware** - Controls motors and drawing
+#### Step 2: Send WiFi Credentials
 
-![Firmware selection](images/firmware-selection.png)
+The original firmware expects connectin to the internet, you need to send you home wifi name and password to the device to bypass this step. (we'll disable this feature in the new firmware)
+You can also try sending a bogus network name and password, maybe it works (I haven't tested it)
 
-#### Step 3: Upload
+
+#### Step 3: Connect to MBC-WB-.....
+
+If previous step is successful, the device reboots and the LED light starts flashing faster. Now you shold see a new wi-fi network named `MBC-WB-.....`. Connect to it.
+
+
+#### Step 4: Upload the firmeware in sequence
+
+THe app will walk you through uploading three files to the device. Each upload will rebot the device, if upload is unsuccessfull try again.
 
 1. Click **Upload ESP32 Firmware**
 2. Wait for the upload to complete (this takes about 30 seconds)
@@ -209,6 +211,7 @@ The app comes with the latest firmware built-in. You'll see two firmware files:
 4. Wait 30 seconds for it to reconnect
 5. Click **Upload SAMD21 Firmware**
 6. Wait for completion
+7. Upload **ESP32 partitions**
 
 ![Upload progress](images/firmware-upload-progress.png)
 
