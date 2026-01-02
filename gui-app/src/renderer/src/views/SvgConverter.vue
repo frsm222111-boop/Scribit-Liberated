@@ -47,8 +47,8 @@
               <line x1="50" y1="100" x2="750" y2="100" stroke="#3498db" stroke-width="3" stroke-dasharray="10,10"/>
 
               <!-- String lines -->
-              <line x1="50" y1="100" :x2="devicePosition.x" :y2="devicePosition.y" stroke="#2ecc71" stroke-width="4"/>
-              <line x1="750" y1="100" :x2="devicePosition.x" :y2="devicePosition.y" stroke="#9b59b6" stroke-width="4"/>
+              <line x1="50" y1="100" :x2="devicePosition.x" :y2="devicePosition.y" stroke="#2ecc71" stroke-width="2" opacity="0.5"/>
+              <line x1="750" y1="100" :x2="devicePosition.x" :y2="devicePosition.y" stroke="#9b59b6" stroke-width="2" opacity="0.5"/>
 
               <!-- SVG Drawing Overlay (scaled to actual size) -->
               <g v-if="svgContent" opacity="0.85" :transform="`translate(${devicePosition.x}, ${devicePosition.y}) scale(${diagramScale})`">
@@ -74,7 +74,7 @@
               </g>
 
               <!-- Device at center (two concentric circles) -->
-              <g :transform="`translate(${devicePosition.x}, ${devicePosition.y})`">
+              <g :transform="`translate(${devicePosition.x}, ${devicePosition.y})`" opacity="0.5">
                 <!-- Outer circle -->
                 <circle cx="0" cy="0" r="16" fill="#34495e" stroke="#2c3e50" stroke-width="3"/>
                 <!-- Inner circle -->
@@ -392,19 +392,19 @@ async function loadSvgContent(filePath) {
       // Parse physical dimensions from original SVG (before stripping units)
       const unitToMm = { mm: 1, cm: 10, in: 25.4, pt: 0.3528, px: 0.2646 }
 
-      const widthMatch = result.content.match(/width="([\d.]+)(mm|cm|in|pt|px)"/)
+      const widthMatch = result.content.match(/width="([\d.]+)(mm|cm|in|pt|px)?"/)
       if (widthMatch) {
         const value = parseFloat(widthMatch[1])
-        const unit = widthMatch[2]
+        const unit = widthMatch[2] || 'px'  // Default to px if no unit (matches Python)
         svgPhysicalWidth.value = value * (unitToMm[unit] || 1)
       } else {
         svgPhysicalWidth.value = null
       }
 
-      const heightMatch = result.content.match(/height="([\d.]+)(mm|cm|in|pt|px)"/)
+      const heightMatch = result.content.match(/height="([\d.]+)(mm|cm|in|pt|px)?"/)
       if (heightMatch) {
         const value = parseFloat(heightMatch[1])
-        const unit = heightMatch[2]
+        const unit = heightMatch[2] || 'px'  // Default to px if no unit (matches Python)
         svgPhysicalHeight.value = value * (unitToMm[unit] || 1)
       } else {
         svgPhysicalHeight.value = null
@@ -424,8 +424,8 @@ async function loadSvgContent(filePath) {
       // This prevents SVGs with physical units from appearing incorrectly sized in browser
       // The actual conversion still uses the original file with units
       let content = result.content
-      content = content.replace(/width="([\d.]+)(mm|cm|in|pt|px)"/g, 'width="$1"')
-      content = content.replace(/height="([\d.]+)(mm|cm|in|pt|px)"/g, 'height="$1"')
+      content = content.replace(/width="([\d.]+)(mm|cm|in|pt|px)?"/g, 'width="$1"')
+      content = content.replace(/height="([\d.]+)(mm|cm|in|pt|px)?"/g, 'height="$1"')
       svgContent.value = content
       status.value = ''
     } else {
