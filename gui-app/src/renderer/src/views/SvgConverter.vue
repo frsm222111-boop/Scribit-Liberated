@@ -130,6 +130,10 @@
             I've confirmed that the pen holder is <a href="#" @click.prevent="showCalibrationDialog = true" class="calibration-link">calibrated</a>
           </label>
         </div>
+
+        <div class="warning-box">
+          <strong>⚠️ Important:</strong> The preview may not be 100% accurate. Monitor your robot while drawing to ensure it stays within bounds. If the robot goes out of bounds or behaves unexpectedly, <strong>unplug the device immediately</strong> to stop it.
+        </div>
       </div>
 
       <div v-if="selectedFile" class="actions">
@@ -905,6 +909,21 @@ function goToManualControl() {
   cursor: pointer;
   width: 18px;
   height: 18px;
+}
+
+.warning-box {
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  color: #856404;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.warning-box strong {
+  color: #664d03;
 }
 
 .calibration-link {
