@@ -4,11 +4,10 @@ Scribit SVG to G-code converter - Overshoot method edition.
 
 Features:
 - Complete SVG path support (M, L, H, V, C, S, Q, T, A, Z)
-- Multi-color pen switching (auto-detects stroke/fill colors)
 - Path optimization (greedy nearest-neighbor)
 - Auto-centering and scaling
 - Proper G91 coordinate mapping with Y-negation
-- ALL 4 PENS WORKING with overshoot method!
+- Single pen drawing (all colors treated the same)
 
 CRITICAL: G91 coordinate mapping requires negating the right string delta!
 - G-code X = left string delta
@@ -24,24 +23,7 @@ Pen Down:
 Pen Up:
   G1 Z30       ; Raise pen
 
-Pen Switching (to next pen 2,3,4):
-  G1 Z30       ; Pen up if down
-  G1 Z72       ; Rotate to next pen
-  G1 Z60       ; Overshoot
-  G1 Z-60      ; Return to engage → next pen up
-
-Pen Switching (pen4 → pen1):
-  G1 Z30       ; Pen up if down
-  G1 Z72       ; First rotation
-  G1 Z72       ; Second rotation
-  G1 Z60       ; Overshoot
-  G1 Z-60      ; Return to engage → pen1 up
-
-Color to Pen Mapping:
-  Black (default) -> Pen 1
-  Red            -> Pen 2
-  Blue           -> Pen 3
-  Green          -> Pen 4
+Note: Multi-color pen switching disabled - all colors use Pen 1
 """
 
 import math
@@ -111,18 +93,8 @@ def calculate_string_lengths(anchor_distance, x, y, gondola_width=105, gondola_h
     return left_length, right_length
 
 def get_color_pen(color_str):
-    """Map color to pen number (1-4). All pens now working!"""
-    if not color_str or color_str in ['black', '#000000', '#000', 'none']:
-        return 1  # Default pen
-
-    # Simple color mapping - all 4 pens work with new method
-    color_map = {
-        'red': 2, '#ff0000': 2, '#f00': 2,
-        'blue': 3, '#0000ff': 3, '#00f': 3,
-        'green': 4, '#00ff00': 4, '#0f0': 4,
-    }
-
-    return color_map.get(color_str.lower(), 1)
+    """Always return pen 1 - multi-color switching disabled."""
+    return 1  # All colors use same pen
 
 def get_svg_scale_factor(root):
     """
