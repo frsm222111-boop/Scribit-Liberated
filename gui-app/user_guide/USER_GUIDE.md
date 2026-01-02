@@ -155,13 +155,7 @@ Before you can use the app, you need to connect it to your ScribIt device over W
 
 ![Device powered on](images/device-on.png)
 
-#### Step 2: Open the UnBrickIt app
-
-1. The welcome screen appears
-
-![Welcom screen](images/welcome.png)
-
-#### Step 3: Connect to you ScribIt Wi-Fi
+#### Step 2: Connect to you ScribIt Wi-Fi
 
 1. On your computer look for a Wi-Fi network named `ScribIt-.....`
 2. Connect to it (this will disconnect you from the internet, that's OK)
