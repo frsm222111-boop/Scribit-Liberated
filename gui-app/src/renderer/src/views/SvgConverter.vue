@@ -197,6 +197,8 @@ const svgPhysicalWidth = ref(null) // Physical width in mm
 const svgPhysicalHeight = ref(null) // Physical height in mm
 const svgViewBoxWidth = ref(null) // ViewBox width in units
 const svgViewBoxHeight = ref(null) // ViewBox height in units
+const svgStrippedWidth = ref(null) // Numeric width value (for browser rendering)
+const svgStrippedHeight = ref(null) // Numeric height value (for browser rendering)
 const processing = ref(false)
 const progress = ref(0)
 const status = ref('')
@@ -257,14 +259,17 @@ const diagramScale = computed(() => {
   // baseScale converts mm to diagram units
   const baseScale = 700 / options.value.anchorDistance
 
-  // If we have physical dimensions and viewBox, scale based on actual physical size
-  if (svgPhysicalWidth.value && svgViewBoxWidth.value) {
-    // Calculate how many mm each viewBox unit represents
+  // If we have physical dimensions and viewBox, scale to match Python's behavior EXACTLY
+  if (svgPhysicalWidth.value && svgViewBoxWidth.value && svgStrippedWidth.value) {
+    // Python does double-scaling (applies svg_scale_factor twice):
+    // 1. Points scaled by svg_scale_factor (viewBox → mm)
+    // 2. Then scaled again by total_scale = svg_scale_factor * user_scale
+    // Final size = original_size * svg_scale_factor²
     const mmPerViewBoxUnit = svgPhysicalWidth.value / svgViewBoxWidth.value
 
-    // Scale to convert viewBox units → mm → diagram units
-    // Each viewBox unit = mmPerViewBoxUnit mm = (mmPerViewBoxUnit * baseScale) diagram units
-    return baseScale * mmPerViewBoxUnit * options.value.scale
+    // Browser renders: viewBox units → strippedWidth pixels
+    // We need: (baseScale * mmPerViewBoxUnit² * viewBoxWidth/strippedWidth)
+    return baseScale * (mmPerViewBoxUnit * mmPerViewBoxUnit) * (svgViewBoxWidth.value / svgStrippedWidth.value) * options.value.scale
   }
 
   // Fallback to old behavior if no physical dimensions
@@ -401,8 +406,10 @@ async function loadSvgContent(filePath) {
         const value = parseFloat(widthMatch[1])
         const unit = widthMatch[2] || 'px'  // Default to px if no unit (matches Python)
         svgPhysicalWidth.value = value * (unitToMm[unit] || 1)
+        svgStrippedWidth.value = value  // Numeric value that browser will use
       } else {
         svgPhysicalWidth.value = null
+        svgStrippedWidth.value = null
       }
 
       const heightMatch = result.content.match(/height="([\d.]+)(mm|cm|in|pt|px)?"/)
@@ -410,8 +417,10 @@ async function loadSvgContent(filePath) {
         const value = parseFloat(heightMatch[1])
         const unit = heightMatch[2] || 'px'  // Default to px if no unit (matches Python)
         svgPhysicalHeight.value = value * (unitToMm[unit] || 1)
+        svgStrippedHeight.value = value  // Numeric value that browser will use
       } else {
         svgPhysicalHeight.value = null
+        svgStrippedHeight.value = null
       }
 
       // Parse viewBox to understand coordinate system
