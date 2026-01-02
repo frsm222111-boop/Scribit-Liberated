@@ -44,6 +44,42 @@ npm run build
 npm run dist
 ```
 
+### Creating a Release
+
+To create a new release:
+
+1. **Bump version** in `package.json`:
+   ```bash
+   # Edit gui-app/package.json, update "version" field
+   # Example: "1.3.0" → "1.4.0"
+   ```
+
+2. **Commit version bump**:
+   ```bash
+   git add gui-app/package.json
+   git commit -m "Bump version to 1.4.0"
+   ```
+
+3. **Create and push tag**:
+   ```bash
+   git tag -a v1.4.0 -m "Release v1.4.0
+
+   - Feature 1
+   - Feature 2
+   - Bug fix 3"
+
+   git push origin gui_app
+   git push origin v1.4.0
+   ```
+
+4. **GitHub Actions** automatically builds:
+   - Firmware binaries (ESP32 + SAMD21)
+   - macOS installer (.dmg)
+   - Windows installer (.exe)
+   - Creates GitHub Release with all artifacts
+
+Release will be available at: https://github.com/karimi/scrubit/releases
+
 ## Features (Planned)
 
 - Firmware upload via espota.py
