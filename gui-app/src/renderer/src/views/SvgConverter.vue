@@ -277,9 +277,9 @@ const diagramScale = computed(() => {
 })
 
 const compensatedStrokeWidth = computed(() => {
-  // Compensate for the ENTIRE diagram scale to keep stroke width at 2.5px visually
+  // Compensate for the ENTIRE diagram scale to keep stroke width at 0.625px visually
   const diagramScaleVal = diagramScale.value
-  const strokeWidth = diagramScaleVal === 0 ? 2.5 : (2.5 / diagramScaleVal)
+  const strokeWidth = diagramScaleVal === 0 ? 0.625 : (0.625 / diagramScaleVal)
   return strokeWidth
 })
 
