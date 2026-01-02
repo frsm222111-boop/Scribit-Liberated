@@ -2,8 +2,6 @@
 
 Welcome! This guide will help you install and use the UnBrickIt app to control your ScribIt wall drawing robot.
 
-![App Screenshot](images/app-overview.png)
-
 ## Table of Contents
 
 - [What is UnBrickIt?](#what-is-unbrickit)
@@ -40,8 +38,6 @@ UnBrickIt is a desktop application that helps you:
 1. Go to the [Releases page](https://github.com/karimi/scrubit/releases)
 2. Download the latest `.dmg` file (looks like `UnBrickIt-1.3.0.dmg`)
 
-![Download page](images/macos-download.png)
-
 #### Step 2: Install the App
 
 1. Open the downloaded `.dmg` file
@@ -50,6 +46,8 @@ UnBrickIt is a desktop application that helps you:
 ![Drag to Applications](images/macos-drag-install.png)
 
 #### Step 3: Remove Security Block
+
+![Terminal command](images/macos-terminal-quarantine.png)
 
 **Why is this step needed?**
 
@@ -64,8 +62,6 @@ macOS has a security feature called **Gatekeeper** that blocks apps from develop
    xattr -d com.apple.quarantine /Applications/UnBrickIt.app
    ```
 
-![Terminal command](images/macos-terminal-quarantine.png)
-
 3. You won't see any message if it worked - that's normal!
 
 #### Step 4: Launch the App
@@ -74,7 +70,6 @@ macOS has a security feature called **Gatekeeper** that blocks apps from develop
 2. Double-click **UnBrickIt**
 3. The app should open without any warnings
 
-![App launches successfully](images/macos-app-open.png)
 
 **Alternative Method (if Terminal doesn't work):**
 
@@ -83,8 +78,6 @@ macOS has a security feature called **Gatekeeper** that blocks apps from develop
 3. Open **System Preferences** → **Security & Privacy**
 4. At the bottom, click **Open Anyway** next to the UnBrickIt message
 5. Click **Open** in the confirmation dialog
-
-![Security & Privacy setting](images/macos-security-privacy.png)
 
 ---
 
@@ -95,14 +88,12 @@ macOS has a security feature called **Gatekeeper** that blocks apps from develop
 1. Go to the [Releases page](https://github.com/karimi/scrubit/releases)
 2. Download the latest `.exe` file (looks like `UnBrickIt-Setup-1.3.0.exe`)
 
-![Download page](images/windows-download.png)
-
 #### Step 2: Run the Installer
 
 1. Double-click the downloaded `.exe` file
 2. You may see a **Windows SmartScreen** warning
 
-![SmartScreen warning](images/windows-smartscreen.png)
+![SmartScreen warning](images/windows-more-info.png)
 
 #### Step 3: Bypass SmartScreen
 
@@ -123,14 +114,10 @@ Windows SmartScreen blocks apps from developers who haven't purchased a code-sig
 2. The app will install to your **Program Files** folder
 3. Click **Finish** when done
 
-![Installation complete](images/windows-install-complete.png)
-
 #### Step 5: Launch the App
 
 1. Find **UnBrickIt** in your Start Menu
 2. Click to launch
-
-![App in Start Menu](images/windows-start-menu.png)
 
 ---
 
@@ -240,8 +227,6 @@ The app includes sample drawings. Click on any sample to preview it:
 1. Click **Select SVG File**
 2. Choose an `.svg` file from your computer
 
-![File picker](images/file-picker.png)
-
 #### Step 3: Configure Drawing Settings
 
 Before drawing, you need to measure three things on your wall:
@@ -254,13 +239,9 @@ Before drawing, you need to measure three things on your wall:
 
 Measure these in millimeters and enter them in the app.
 
-![Settings panel](images/drawing-settings.png)
-
 **Preview:**
 
 The preview shows what your drawing will look like on the wall. Each grid square is 100mm × 100mm, so you can check if the size looks right.
-
-![Preview with grid](images/preview-grid.png)
 
 You can adjust the **Scale** slider to make the drawing bigger or smaller.
 
@@ -270,8 +251,6 @@ You can adjust the **Scale** slider to make the drawing bigger or smaller.
 
 1. Check the **"I've confirmed that the pen holder is calibrated"** box
 2. Click the link to see the calibration diagram if you're unsure
-
-![Calibration checkbox](images/calibration-checkbox.png)
 
 **To calibrate:**
 1. Go to the **Manual Control** tab
@@ -284,7 +263,7 @@ You can adjust the **Scale** slider to make the drawing bigger or smaller.
 
 Check the **"I've confirmed that the dimensions above are correct"** box.
 
-![Confirm dimensions](images/confirm-dimensions.png)
+![Confirm dimensions](images/calibration-checkbox.png)
 
 #### Step 6: Send the Drawing
 
