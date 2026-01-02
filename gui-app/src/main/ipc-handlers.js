@@ -259,10 +259,11 @@ function registerIpcHandlers() {
     const path = require('path')
     const { app } = require('electron')
     try {
-      // Use app.getAppPath() to get the correct base path
-      // In dev: points to project root, in production: points to app.asar
-      const appPath = app.getAppPath()
-      const samplesDir = path.join(appPath, 'samples')
+      // In dev: use app.getAppPath() (project root)
+      // In production: use process.resourcesPath (extraResources location)
+      const isDev = !app.isPackaged
+      const basePath = isDev ? app.getAppPath() : process.resourcesPath
+      const samplesDir = path.join(basePath, 'samples')
 
       console.log('Looking for samples in:', samplesDir)
 
