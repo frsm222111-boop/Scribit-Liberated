@@ -13,12 +13,23 @@ function getScriptsPath() {
 }
 
 /**
- * Get system Python executable
- * @returns {string} Python command
+ * Get bundled Python executable path
+ * @returns {string} Path to Python executable
  */
 function getPythonCommand() {
-  // Try python3 first (macOS/Linux), fall back to python (Windows)
-  return process.platform === 'win32' ? 'python' : 'python3'
+  const runtimePath = getPythonRuntimePath()
+  const pythonExe = process.platform === 'win32' ? 'python.exe' : 'python'
+  return path.join(runtimePath, 'bin', pythonExe)
+}
+
+/**
+ * Get path to bundled Python runtime
+ */
+function getPythonRuntimePath() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'python', 'runtime')
+  }
+  return path.join(__dirname, '../../resources/python/runtime')
 }
 
 /**
@@ -36,7 +47,7 @@ function getPythonCommand() {
  * @param {Function} onProgress - Progress callback (receives stdout/stderr)
  * @returns {Promise<{success: boolean, output: string, error?: string}>}
  */
-function convertSvgToGcode(options, onProgress) {
+async function convertSvgToGcode(options, onProgress) {
   return new Promise((resolve, reject) => {
     const scriptsPath = getScriptsPath()
     const scriptPath = path.join(scriptsPath, 'scribit_svg_to_gcode.py')

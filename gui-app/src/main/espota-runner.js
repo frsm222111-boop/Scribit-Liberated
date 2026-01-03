@@ -23,11 +23,23 @@ function getFirmwarePath() {
 }
 
 /**
- * Get system Python executable
- * @returns {string} Python command
+ * Get bundled Python executable path
+ * @returns {string} Path to Python executable
  */
 function getPythonCommand() {
-  return process.platform === 'win32' ? 'python' : 'python3'
+  const runtimePath = getPythonRuntimePath()
+  const pythonExe = process.platform === 'win32' ? 'python.exe' : 'python'
+  return path.join(runtimePath, 'bin', pythonExe)
+}
+
+/**
+ * Get path to bundled Python runtime
+ */
+function getPythonRuntimePath() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'python', 'runtime')
+  }
+  return path.join(__dirname, '../../resources/python/runtime')
 }
 
 /**
@@ -44,7 +56,7 @@ function getPythonCommand() {
  * @param {Function} onProgress - Progress callback (receives stdout/stderr)
  * @returns {Promise<{success: boolean, output: string, error?: string}>}
  */
-function uploadFirmware(options, onProgress) {
+async function uploadFirmware(options, onProgress) {
   return new Promise((resolve, reject) => {
     const pythonPath = getPythonPath()
     const firmwarePath = getFirmwarePath()

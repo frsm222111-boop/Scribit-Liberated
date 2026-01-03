@@ -30,5 +30,6 @@ __pycache__/
 # Resources
 resources/firmware/*.bin
 resources/python/__pycache__/
+resources/python/runtime/
 !resources/python/*.py
 !resources/scripts/*.py

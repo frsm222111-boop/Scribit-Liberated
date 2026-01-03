@@ -9,7 +9,8 @@
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "postinstall": "node scripts/setup-python.js"
   },
   "keywords": [
     "unbrickit",
@@ -27,6 +28,7 @@
     "url": "https://github.com/karimi/scrubit.git"
   },
   "devDependencies": {
+    "@bjia56/portable-python-3.11": "^0.1.27",
     "@vitejs/plugin-vue": "^6.0.3",
     "electron": "^39.2.7",
     "electron-builder": "^26.0.12",
