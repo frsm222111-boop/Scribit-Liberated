@@ -35,7 +35,7 @@ UnBrickIt is a desktop application that helps you:
 
 #### Step 1: Download the App
 
-1. Go to the [Releases page](https://github.com/karimi/scrubit/releases)
+1. Go to the [Releases page](https://github.com/karimi/unbrickit/releases)
 2. Download the latest `.dmg` file (looks like `UnBrickIt-1.3.0.dmg`)
 
 #### Step 2: Install the App
@@ -85,7 +85,7 @@ macOS has a security feature called **Gatekeeper** that blocks apps from develop
 
 #### Step 1: Download the App
 
-1. Go to the [Releases page](https://github.com/karimi/scrubit/releases)
+1. Go to the [Releases page](https://github.com/karimi/unbrickit/releases)
 2. Download the latest `.exe` file (looks like `UnBrickIt-Setup-1.3.0.exe`)
 
 #### Step 2: Run the Installer
@@ -383,8 +383,8 @@ Use Manual Control to test movements, calibrate the pen, and check your robot's 
 
 ### Need More Help?
 
-- **GitHub Issues:** [Report a problem](https://github.com/karimi/scrubit/issues)
-- **Source Code:** [View on GitHub](https://github.com/karimi/scrubit)
+- **GitHub Issues:** [Report a problem](https://github.com/karimi/unbrickit/issues)
+- **Source Code:** [View on GitHub](https://github.com/karimi/unbrickit)
 
 ---
 

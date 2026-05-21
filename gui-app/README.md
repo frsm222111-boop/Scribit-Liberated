@@ -6,7 +6,7 @@ Desktop app for ScribIt firmware upload and G-code control.
 
 ### macOS
 
-1. Download `.dmg` from [Releases](https://github.com/karimi/scrubit/releases)
+1. Download `.dmg` from [Releases](https://github.com/karimi/unbrickit/releases)
 2. Open DMG, drag to Applications
 3. **Remove quarantine flag** (required on first launch):
    ```bash
@@ -18,7 +18,7 @@ Desktop app for ScribIt firmware upload and G-code control.
 
 ### Windows
 
-1. Download `.exe` from [Releases](https://github.com/karimi/scrubit/releases)
+1. Download `.exe` from [Releases](https://github.com/karimi/unbrickit/releases)
 2. Run installer
 3. Launch from Start Menu
 
@@ -78,7 +78,7 @@ To create a new release:
    - Windows installer (.exe)
    - Creates GitHub Release with all artifacts
 
-Release will be available at: https://github.com/karimi/scrubit/releases
+Release will be available at: https://github.com/karimi/unbrickit/releases
 
 ## Features (Planned)
 

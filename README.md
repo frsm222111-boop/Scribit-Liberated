@@ -490,6 +490,15 @@ curl -X POST http://192.168.240.1:8888/upload \
 
 ---
 
+## Releasing a New Version
+
+See [VERSION.md](VERSION.md) for complete release workflow including:
+- Bumping version in `gui-app/package.json`
+- Generating firmware version headers
+- Building and tagging releases
+
+---
+
 ## Support
 
 For firmware build/deployment issues, see [FIRMWARE.md](FIRMWARE.md)
