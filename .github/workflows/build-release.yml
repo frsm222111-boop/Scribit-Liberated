@@ -23,16 +23,19 @@ jobs:
           cp -r ExtraFile/arduino-mqtt Firmware/ScribitESP/
           cp -r ExtraFile/StepperDriver Firmware/ScribitESP/
 
+      - name: Generate firmware version header
+        run: node scripts/generate-version.js
+
       - name: Build ESP32 firmware
         run: |
-          docker-compose -f docker/docker-compose.yml run --rm scribit-firmware \
+          docker compose -f docker/docker-compose.yml run --rm scribit-firmware \
             arduino-cli compile --fqbn briki:mbc-wb:mbc:mcu=esp \
             --output-dir /workspace/builds \
             /workspace/source/Firmware/ScribitESP/ScribitESP.ino
 
       - name: Build SAMD21 firmware
         run: |
-          docker-compose -f docker/docker-compose.yml run --rm scribit-firmware \
+          docker compose -f docker/docker-compose.yml run --rm scribit-firmware \
             arduino-cli compile --fqbn briki:mbc-wb:mbc:mcu=samd \
             --output-dir /workspace/builds \
             /workspace/source/Firmware/MK4duo/MK4duo.ino

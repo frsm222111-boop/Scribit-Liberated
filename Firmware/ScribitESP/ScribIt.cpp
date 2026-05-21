@@ -116,26 +116,61 @@ void ScribIt::begin()
     }
 
     //Wifi config---------------------------
-    WiFi.begin();
-    if (WiFi.waitForConnectResult() == WL_CONNECTED)
+    //Local mode: If no MQTT host, force AP mode for HTTP control
+    bool localMode = (strlen(SI_MQTT_HOST) == 0);
+
+    if (localMode)
     {
 #ifdef SI_DEBUG_ESP
-        Serial.printf("Connected to wifi \"%s\", RSSI:%d dB IP:", WiFi.SSID().c_str(), WiFi.RSSI());
-        Serial.println(WiFi.localIP());
+        Serial.println("Local mode detected - starting AP mode");
+#endif
+        //Start AP mode for local HTTP control
+        char apSsid[16];
+        sprintf(apSsid, SI_AP_SSID, m_ID[3], m_ID[4], m_ID[5]);
+        WiFi.softAP(apSsid, nullptr);
+#ifdef SI_DEBUG_ESP
+        Serial.printf("AP started: %s\n", apSsid);
+        Serial.print("IP: ");
+        Serial.println(WiFi.softAPIP());
+#endif
+        //Start HTTP server for local mode control
+        m_localServer = new WiFiServer(8888);
+        m_localServer->begin();
+#ifdef SI_DEBUG_ESP
+        Serial.println("HTTP server started on port 8888");
 #endif
     }
     else
     {
-        configureWifi();
+        WiFi.begin();
+        if (WiFi.waitForConnectResult() == WL_CONNECTED)
+        {
+#ifdef SI_DEBUG_ESP
+            Serial.printf("Connected to wifi \"%s\", RSSI:%d dB IP:", WiFi.SSID().c_str(), WiFi.RSSI());
+            Serial.println(WiFi.localIP());
+#endif
+        }
+        else
+        {
+            configureWifi();
+        }
     }
 
     if (!m_testMode) //Skip if test mode
     {
         leds.doubleBlink(255, 255, 255, 0.5);
-        //Init MQTT----------------------------
-        SIMQTT.begin(m_ID);
-
-        SIMQTT.debug(TAG, "MQTT Started");
+        //Init MQTT (only if host configured)----------------------------
+        if (strlen(SI_MQTT_HOST) > 0)
+        {
+            SIMQTT.begin(m_ID);
+            SIMQTT.debug(TAG, "MQTT Started");
+        }
+        else
+        {
+#ifdef SI_DEBUG_ESP
+            Serial.println("Local mode: MQTT disabled (no host configured)");
+#endif
+        }
     }
 
     //Init serial manager
@@ -164,8 +199,11 @@ void ScribIt::begin()
         {
             errorCode = SIMQTT_ERROR_CANNOT_SYNC_MK4DUO;
             errorMessage = "Sync with Mk4Duo failed";
-            SIMQTT.error(errorMessage, errorCode);
-            setState(SI_ERROR);
+#ifdef SI_DEBUG_ESP
+            Serial.println("WARNING: SAMD sync failed - continuing in local mode");
+#endif
+            //Don't enter ERROR state - continue anyway for local mode
+            setState(SI_BOOT);
         }
         else if (!m_testMode)
         {
@@ -177,9 +215,19 @@ void ScribIt::begin()
 
     //Wait for go message (Status req)-------------------------------
     uint32_t startTime = millis();
+    const uint32_t BOOT_LOOP_TIMEOUT_MS = 3000; // 3 second timeout for local mode
     //Loop until state req received or always if in error
     while (m_state == SI_BOOT || m_state == SI_ERROR)
     {
+        //Local mode: Force transition to IDLE after timeout (no MQTT broker)
+        if (millis() - startTime > BOOT_LOOP_TIMEOUT_MS)
+        {
+#ifdef SI_DEBUG_ESP
+            Serial.println("Boot loop timeout - entering local mode (IDLE)");
+#endif
+            setState(SI_IDLE);
+            break;
+        }
         //If timeout elapsed send boot message again
         if (m_state == SI_BOOT && millis() - startTime > BOOT_MESSAGE_RESEND_TIMEOUT_MS)
         {
@@ -226,6 +274,12 @@ void ScribIt::loop()
 
     if (!m_testMode)
     {
+        //Handle HTTP requests in local mode
+        if (m_localServer != nullptr)
+        {
+            handleHTTPRequests();
+        }
+
         //Process MQTT
         SIMQTTClass::SIMQTTState mqttState = SIMQTT.loop();
         //Check connection status

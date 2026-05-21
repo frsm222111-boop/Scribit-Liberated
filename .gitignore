@@ -3,5 +3,15 @@ Firmware/ScribitESP/SIConfig.hpp
 Firmware/ScribitESP/ScribitVersion.hpp
 Firmware/MK4duo/Mk4duoVersion.h
 
+.secrets
 
 .DS_Store
+
+# GUI App
+gui-app/node_modules/
+gui-app/out/
+gui-app/dist/
+gui-app/.DS_Store
+gui-app/resources/firmware/*.bin
+gui-app/resources/python/*
+!gui-app/resources/python/.gitkeep

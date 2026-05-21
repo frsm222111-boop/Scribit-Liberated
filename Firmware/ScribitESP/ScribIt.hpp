@@ -60,10 +60,18 @@ class ScribIt
   //IMU data
   CircBufInfinite<int16_t> m_imuData;
 
+  //Local mode HTTP server
+  WiFiServer *m_localServer;
+
   /**
    * @brief Generates access point for receiving ssid and password to connect to a wifi network
    */
   void configureWifi();
+
+  /**
+   * @brief Handles incoming HTTP requests for local mode control
+   */
+  void handleHTTPRequests();
 
   /**
    * @brief Evaluates input commands from MQTT
@@ -217,6 +225,7 @@ public:
     m_isErase = false;
     m_printingTime = 0;
     m_wallID=0;
+    m_localServer = nullptr;
   };
 
   /**
