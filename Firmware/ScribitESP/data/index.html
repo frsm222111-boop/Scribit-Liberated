@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unbrickit — Scribit Control</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Unbrickit</h1>
+      <p class="subtitle">Scribit Local Control</p>
+      <div id="status-bar" class="status-bar">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Connecting…</span>
+      </div>
+    </header>
+
+    <section class="upload-section">
+      <h2>Upload G-code</h2>
+      <div
+        id="drop-zone"
+        class="drop-zone"
+        onclick="document.getElementById('file-input').click()"
+      >
+        <div class="drop-zone-content">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+          <p>Drop SVG or G-code here, or click to browse</p>
+          <span class="drop-hint">.gcode, .svg files</span>
+        </div>
+        <input type="file" id="file-input" accept=".gcode,.svg" hidden>
+      </div>
+
+      <div id="file-info" class="file-info hidden">
+        <span id="file-name"></span>
+        <span id="file-size"></span>
+      </div>
+
+      <div class="options">
+        <label class="toggle-row">
+          <input type="checkbox" id="erase-mode">
+          <span class="toggle-label">Erase mode</span>
+          <span class="toggle-hint">Shifts Y coordinates −77mm for ceramic eraser</span>
+        </label>
+      </div>
+
+      <div id="upload-progress" class="progress hidden">
+        <div class="progress-bar" id="progress-bar"></div>
+        <span id="progress-text">0%</span>
+      </div>
+
+      <button id="upload-btn" class="btn primary" disabled>Upload</button>
+    </section>
+
+    <section class="controls">
+      <h2>Device Controls</h2>
+      <div class="button-grid">
+        <button id="btn-home" class="btn secondary">Home Pen (G77)</button>
+        <button id="btn-pause" class="btn secondary" disabled>Pause</button>
+        <button id="btn-resume" class="btn secondary" disabled>Resume</button>
+        <button id="btn-stop" class="btn danger" disabled>Stop</button>
+      </div>
+
+      <div id="device-info" class="device-info hidden">
+        <h3>Device Info</h3>
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">State</span>
+            <span class="info-value" id="info-state">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Serial</span>
+            <span class="info-value" id="info-serial">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Firmware</span>
+            <span class="info-value" id="info-firmware">—</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="calibration">
+      <h2>Manual Calibration Helper</h2>
+      <p class="section-hint">Enter your wall dimensions to calculate starting position</p>
+      <div class="calib-form">
+        <div class="input-row">
+          <label>Anchor distance (mm)</label>
+          <input type="number" id="calib-anchor" value="2250" min="500" max="5000">
+        </div>
+        <div class="input-row">
+          <label>Left string length (mm)</label>
+          <input type="number" id="calib-left" value="1270" min="500" max="5000">
+        </div>
+        <div class="input-row">
+          <label>Right string length (mm)</label>
+          <input type="number" id="calib-right" value="1270" min="500" max="5000">
+        </div>
+        <div class="input-row">
+          <label>Wall height (mm, optional)</label>
+          <input type="number" id="calib-height" placeholder="e.g. 1500">
+        </div>
+        <button id="calib-generate" class="btn secondary">Generate Starting G-code</button>
+      </div>
+      <pre id="calib-output" class="gcode-output hidden"></pre>
+      <button id="calib-upload" class="btn primary hidden">Send to Device</button>
+    </section>
+
+    <footer>
+      <a href="https://github.com/karimi/unbrickit" target="_blank">View on GitHub</a>
+      <span class="separator">·</span>
+      <span id="connection-info">Checking connection…</span>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

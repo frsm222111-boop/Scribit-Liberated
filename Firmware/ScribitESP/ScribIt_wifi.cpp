@@ -417,6 +417,115 @@ void ScribIt::handleHTTPRequests()
             }
         }
     }
+    else if (path == "/api/status" && method == "GET")
+    {
+        const char *stateStr = "UNKNOWN";
+        switch (m_state)
+        {
+        case SI_IDLE:     stateStr = "IDLE";     break;
+        case SI_PRINTING: stateStr = "PRINTING"; break;
+        case SI_ERASING:  stateStr = "ERASING";  break;
+        case SI_BOOT:     stateStr = "BOOT";     break;
+        case SI_ERROR:    stateStr = "ERROR";    break;
+        default:                                break;
+        }
+
+        PausedState ps = sm.getPausedState();
+        const char *pauseStr = "running";
+        if (ps == SIPS_PAUSED)     pauseStr = "paused";
+        else if (ps == SIPS_REQUESTED) pauseStr = "pausing";
+
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: application/json");
+        client.println("Access-Control-Allow-Origin: *");
+        client.println();
+        client.printf(
+            "{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\"}\\n",
+            stateStr, pauseStr,
+            m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5],
+            FIRMWARE_VERSION);
+    }
+    else if (path == "/gcode" && method == "POST")
+    {
+        // Send raw g-code line(s) directly to serial manager
+        if (contentLen == 0 || contentLen > 4096)
+        {
+            client.println("HTTP/1.1 400 Bad Request");
+            client.println("Content-Type: application/json");
+            client.println();
+            client.println("{\"error\":\"Invalid content\"}");
+        }
+        else
+        {
+            String gcodeCmd = "";
+            uint16_t bytesRead = 0;
+            while (bytesRead < contentLen && client.available())
+            {
+                char c = client.read();
+                gcodeCmd += c;
+                bytesRead++;
+            }
+            sm.addLineToStream(gcodeCmd.c_str());
+
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-Type: application/json");
+            client.println("Access-Control-Allow-Origin: *");
+            client.println();
+            client.printf("{\"status\":\"queued\",\"len\":%d}\\n", bytesRead);
+        }
+    }
+    else if (path == "/stop" && method == "POST")
+    {
+        sm.stopStream();
+        setState(SI_IDLE);
+
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: application/json");
+        client.println("Access-Control-Allow-Origin: *");
+        client.println();
+        client.println("{\"status\":\"stopped\"}");
+    }
+    else if (path.startsWith("/"))
+    {
+        // Static file from SPIFFS /data/ directory
+        String filePath = path;
+        if (filePath.indexOf("?") > 0)
+            filePath = filePath.substring(0, filePath.indexOf("?"));
+
+        // Map /index.html and bare / to /index.html
+        if (filePath == "/" || filePath == "")
+            filePath = "/index.html";
+
+        String spiffsPath = "/data" + filePath;
+
+        File file = SPIFFS.open(spiffsPath.c_str(), "r");
+        if (!file)
+        {
+            client.println("HTTP/1.1 404 Not Found");
+            client.println("Content-Type: text/plain");
+            client.println();
+            client.println("File not found");
+        }
+        else
+        {
+            // Guess content type from extension
+            const char *ct = "text/plain";
+            if (spiffsPath.endsWith(".html")) ct = "text/html";
+            else if (spiffsPath.endsWith(".css"))  ct = "text/css";
+            else if (spiffsPath.endsWith(".js"))   ct = "application/javascript";
+            else if (spiffsPath.endsWith(".json")) ct = "application/json";
+            else if (spiffsPath.endsWith(".png"))   ct = "image/png";
+            else if (spiffsPath.endsWith(".jpg") || spiffsPath.endsWith(".jpeg")) ct = "image/jpeg";
+            else if (spiffsPath.endsWith(".gif"))  ct = "image/gif";
+            else if (spiffsPath.endsWith(".svg"))  ct = "image/svg+xml";
+            else if (spiffsPath.endsWith(".ico"))  ct = "image/x-icon";
+
+            client.printf("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n",
+                          ct, file.size());
+            client.write((const uint8_t *)file.readString().c_str(), file.size());
+            file.close();
+        }
+    }
     else
     {
         //404 Not found

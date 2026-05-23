@@ -3,6 +3,10 @@ Firmware/ScribitESP/SIConfig.hpp
 Firmware/ScribitESP/ScribitVersion.hpp
 Firmware/MK4duo/Mk4duoVersion.h
 
+# Build artifacts
+docker/builds/
+gui-app/resources/firmware/
+
 .secrets
 
 .DS_Store

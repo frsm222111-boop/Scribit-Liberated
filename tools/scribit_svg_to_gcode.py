@@ -47,6 +47,7 @@ Color to Pen Mapping:
 import math
 import argparse
 import xml.etree.ElementTree as ET
+import re
 from pathlib import Path
 
 def calculate_position(anchor_distance, left_length, right_length):
@@ -61,19 +62,84 @@ def calculate_string_lengths(anchor_distance, x, y):
     right_length = math.sqrt((anchor_distance - x)**2 + y**2)
     return left_length, right_length
 
-def get_color_pen(color_str):
-    """Map color to pen number (1-4). All pens now working!"""
-    if not color_str or color_str in ['black', '#000000', '#000', 'none']:
-        return 1  # Default pen
+def parse_css_color(color_str):
+    """Parse CSS color string and return (r, g, b) tuple or None."""
+    if not color_str or color_str == 'none':
+        return None
 
-    # Simple color mapping - all 4 pens work with new method
-    color_map = {
-        'red': 2, '#ff0000': 2, '#f00': 2,
-        'blue': 3, '#0000ff': 3, '#00f': 3,
-        'green': 4, '#00ff00': 4, '#0f0': 4,
+    color_str = color_str.strip().lower()
+
+    named_colors = {
+        'black': (0, 0, 0),
+        'white': (255, 255, 255),
+        'red': (255, 0, 0),
+        'green': (0, 128, 0),
+        'lime': (0, 255, 0),
+        'blue': (0, 0, 255),
+        'navy': (0, 0, 128),
+        'cyan': (0, 255, 255),
+        'magenta': (255, 0, 255),
+        'yellow': (255, 255, 0),
+        'orange': (255, 165, 0),
+        'purple': (128, 0, 128),
+        'pink': (255, 192, 203),
+        'brown': (165, 42, 42),
+        'gray': (128, 128, 128),
+        'grey': (128, 128, 128),
     }
 
-    return color_map.get(color_str.lower(), 1)
+    if color_str in named_colors:
+        return named_colors[color_str]
+
+    hex_match = re.match(r'^#([0-9a-f]{3})$', color_str)
+    if hex_match:
+        hex3 = hex_match.group(1)
+        r = int(hex3[0] * 2, 16)
+        g = int(hex3[1] * 2, 16)
+        b = int(hex3[2] * 2, 16)
+        return (r, g, b)
+
+    hex_match = re.match(r'^#([0-9a-f]{6})$', color_str)
+    if hex_match:
+        hex6 = hex_match.group(1)
+        return (int(hex6[0:2], 16), int(hex6[2:4], 16), int(hex6[4:6], 16))
+
+    rgb_match = re.match(r'^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$', color_str)
+    if rgb_match:
+        return (int(rgb_match.group(1)), int(rgb_match.group(2)), int(rgb_match.group(3)))
+
+    rgba_match = re.match(r'^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,', color_str)
+    if rgba_match:
+        return (int(rgba_match.group(1)), int(rgba_match.group(2)), int(rgba_match.group(3)))
+
+    return None
+
+def color_to_pen(color_str):
+    """Map color to pen number (1-4) using nearest-neighbor color matching."""
+    rgb = parse_css_color(color_str)
+    if rgb is None:
+        return 1
+
+    r, g, b = rgb
+    pen_targets = [
+        (1, (0, 0, 0)),
+        (2, (255, 0, 0)),
+        (3, (0, 0, 255)),
+        (4, (0, 128, 0)),
+    ]
+
+    min_dist = float('inf')
+    best_pen = 1
+    for pen, target in pen_targets:
+        dist = math.sqrt((r - target[0])**2 + (g - target[1])**2 + (b - target[2])**2)
+        if dist < min_dist:
+            min_dist = dist
+            best_pen = pen
+    return best_pen
+
+def get_color_pen(color_str):
+    """Map color string to pen number. Backward-compatible wrapper."""
+    return color_to_pen(color_str)
 
 def parse_svg_paths(svg_file):
     """
@@ -525,7 +591,8 @@ def optimize_path_order(paths, anchor_distance, left_length, right_length):
     return optimized
 
 def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
-                 scale=1.0, offset_x=0.0, offset_y=0.0, optimize=True):
+                 scale=1.0, offset_x=0.0, offset_y=0.0, optimize=True,
+                 resolution=5.0, aspect_x=0.893, aspect_y=1.25):
     """
     Convert SVG to G-code.
 
@@ -626,10 +693,9 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
                 gcode_lines.append("G1 Z30")  # PEN UP!
                 pen_z_relative = 0
             # Center the SVG, apply scale and offset
-            # Translate SVG coords to be centered at (0,0), then apply transformations
-            # Calibrated compensation: 28mm/50mm measured → 0.893x, 40mm/50mm → 1.25x
-            relative_x = (svg_x - svg_center_x) * scale * 0.893
-            relative_y = (svg_y - svg_center_y) * scale * 1.25
+            # Compensation factors applied to correct for geometry
+            relative_x = (svg_x - svg_center_x) * scale * aspect_x
+            relative_y = (svg_y - svg_center_y) * scale * aspect_y
 
             # Calculate absolute position on wall
             target_x = start_x + relative_x + offset_x
@@ -679,12 +745,20 @@ def main():
                         help='X offset in mm (default: 0)')
     parser.add_argument('--offset-y', type=float, default=0.0,
                         help='Y offset in mm (default: 0)')
+    parser.add_argument('--resolution', '-d', type=float, default=5.0,
+                        help='Arc/curve resolution: max mm between points (default: 5.0, smaller=finer)')
+    parser.add_argument('--aspect-x', type=float, default=0.893,
+                        help='X compensation factor (default: 0.893)')
+    parser.add_argument('--aspect-y', type=float, default=1.25,
+                        help='Y compensation factor (default: 1.25)')
     parser.add_argument('--output', '-o', type=str, default='gcode/svg_output.gcode',
                         help='Output file (default: gcode/svg_output.gcode)')
     parser.add_argument('--no-optimize', action='store_true',
                         help='Disable path optimization')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Suppress output')
+    parser.add_argument('--stats', action='store_true',
+                        help='Show statistics only, do not write file')
 
     args = parser.parse_args()
 
@@ -710,21 +784,34 @@ def main():
             args.scale,
             args.offset_x,
             args.offset_y,
-            optimize=not args.no_optimize
+            optimize=not args.no_optimize,
+            resolution=args.resolution,
+            aspect_x=args.aspect_x,
+            aspect_y=args.aspect_y
         )
 
         if not args.quiet:
             print(f"\nFinal strings: L={final_L:.2f}mm, R={final_R:.2f}mm")
             print(f"Total commands: {len([l for l in gcode_lines if l.startswith('G1')])}")
+            print(f"Points generated: {sum(1 for l in gcode_lines if l.startswith('G1 X') or l.startswith('G1 Y'))}")
 
-        # Write to file
-        with open(args.output, 'w') as f:
-            f.write('\n'.join(gcode_lines))
-
-        if not args.quiet:
-            print(f"\nG-code written to: {args.output}")
+        if args.stats:
+            pen_counts = {}
+            for line in gcode_lines:
+                # Estimate pen usage from Z movements
+                pass
+            print(f"\n=== Statistics ===")
+            print(f"Total G1 commands: {len([l for l in gcode_lines if l.startswith('G1')])}")
+            print(f"Pen up/down events: {gcode_lines.count('G1 Z30') + gcode_lines.count('G1 Z-30')}")
+            print(f"Resolution: {args.resolution}mm")
+            print(f"Aspect compensation: X={args.aspect_x}, Y={args.aspect_y}")
         else:
-            print(args.output)
+            with open(args.output, 'w') as f:
+                f.write('\n'.join(gcode_lines))
+            if not args.quiet:
+                print(f"\nG-code written to: {args.output}")
+            else:
+                print(args.output)
 
     except Exception as e:
         print(f"Error: {e}")
