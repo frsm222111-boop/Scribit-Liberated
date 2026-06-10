@@ -48,6 +48,8 @@ import math
 import argparse
 import xml.etree.ElementTree as ET
 import re
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 def calculate_position(anchor_distance, left_length, right_length):
@@ -592,7 +594,7 @@ def optimize_path_order(paths, anchor_distance, left_length, right_length):
 
 def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
                  scale=1.0, offset_x=0.0, offset_y=0.0, optimize=True,
-                 resolution=5.0, aspect_x=0.893, aspect_y=1.25):
+                 resolution=5.0, aspect_x=1.0, aspect_y=1.0, segment_mm=1.5):
     """
     Convert SVG to G-code.
 
@@ -671,7 +673,7 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             current_pen = pen_number
             pen_z_relative = 0  # After switch, always at pen up
 
-        points = parse_path_to_points(path_data)
+        points = parse_path_to_points(path_data, resolution=resolution)
 
         # Find SVG bounding box to center the drawing
         if points:
@@ -692,26 +694,27 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
                 # Raise pen
                 gcode_lines.append("G1 Z30")  # PEN UP!
                 pen_z_relative = 0
-            # Center the SVG, apply scale and offset
-            # Compensation factors applied to correct for geometry
+            # Target Cartesian position on the wall
             relative_x = (svg_x - svg_center_x) * scale * aspect_x
             relative_y = (svg_y - svg_center_y) * scale * aspect_y
-
-            # Calculate absolute position on wall
             target_x = start_x + relative_x + offset_x
             target_y = start_y + relative_y + offset_y
 
-            # Calculate string lengths
-            target_L, target_R = calculate_string_lengths(anchor_distance, target_x, target_y)
-
-            delta_L = target_L - current_L
-            delta_R = target_R - current_R
-
-            # Apply Y negation for G91!
-            gcode_lines.append(f"G1 X{delta_L:.3f} Y{-delta_R:.3f}")
-
-            current_L = target_L
-            current_R = target_R
+            # Subdivide the move in CARTESIAN space so straight lines stay
+            # straight. The firmware interpolates string lengths linearly, so a
+            # single long move bows into an arc; splitting a pen-down move into
+            # <= segment_mm steps keeps it on the true straight path. Pen-up
+            # travel moves don't draw, so they stay single.
+            cur_x, cur_y = calculate_position(anchor_distance, current_L, current_R)
+            seg_len = math.hypot(target_x - cur_x, target_y - cur_y)
+            n_seg = max(1, math.ceil(seg_len / segment_mm)) if pen_down else 1
+            for s in range(1, n_seg + 1):
+                t = s / n_seg
+                ix = cur_x + (target_x - cur_x) * t
+                iy = cur_y + (target_y - cur_y) * t
+                seg_L, seg_R = calculate_string_lengths(anchor_distance, ix, iy)
+                gcode_lines.append(f"G1 X{seg_L - current_L:.3f} Y{-(seg_R - current_R):.3f}")
+                current_L, current_R = seg_L, seg_R
 
     # Ensure pen is up before returning
     if pen_z_relative == -30:
@@ -728,6 +731,75 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
     gcode_lines.append("M18")  # Disable steppers
 
     return gcode_lines, current_L, current_R
+
+def upload_gcode(gcode_content, ip, quiet=False):
+    """
+    Upload g-code to Scribit device via HTTP POST.
+
+    Args:
+        gcode_content: The g-code string to upload
+        ip: Device IP address
+        quiet: Suppress progress output
+
+    Returns:
+        True on success, False on failure
+    """
+    url = f"http://{ip}:8888/upload"
+
+    try:
+        if not quiet:
+            print(f"Uploading to {url}...")
+
+        req = urllib.request.Request(
+            url,
+            data=gcode_content.encode('utf-8'),
+            headers={'Content-Type': 'text/plain'},
+            method='POST'
+        )
+
+        # Use a callback to show progress
+        def progress_hook(block_num, block_size, total_size):
+            if total_size > 0 and not quiet:
+                progress = min(int(block_num * block_size * 100 / total_size), 100)
+                print(f"\rUploading... {progress}%", end='', flush=True)
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            if not quiet:
+                print()  # Newline after progress
+            response_data = response.read().decode('utf-8')
+            if not quiet:
+                print(f"Device response: {response_data}")
+            return True
+
+    except urllib.error.HTTPError as e:
+        if not quiet:
+            print()  # Newline after progress
+        print(f"HTTP Error {e.code}: {e.reason}")
+        try:
+            error_body = e.read().decode('utf-8')
+            print(f"Response: {error_body}")
+        except:
+            pass
+        return False
+
+    except urllib.error.URLError as e:
+        if not quiet:
+            print()  # Newline after progress
+        print(f"Connection failed: {e.reason}")
+        return False
+
+    except TimeoutError:
+        if not quiet:
+            print()
+        print("Connection timed out")
+        return False
+
+    except Exception as e:
+        if not quiet:
+            print()
+        print(f"Upload failed: {e}")
+        return False
+
 
 def main():
     parser = argparse.ArgumentParser(description='Convert SVG to Scribit G-code')
@@ -747,10 +819,12 @@ def main():
                         help='Y offset in mm (default: 0)')
     parser.add_argument('--resolution', '-d', type=float, default=5.0,
                         help='Arc/curve resolution: max mm between points (default: 5.0, smaller=finer)')
-    parser.add_argument('--aspect-x', type=float, default=0.893,
-                        help='X compensation factor (default: 0.893)')
-    parser.add_argument('--aspect-y', type=float, default=1.25,
-                        help='Y compensation factor (default: 1.25)')
+    parser.add_argument('--aspect-x', type=float, default=1.0,
+                        help='X scale-calibration factor (default: 1.0; tune only via physical test)')
+    parser.add_argument('--aspect-y', type=float, default=1.0,
+                        help='Y scale-calibration factor (default: 1.0; tune only via physical test)')
+    parser.add_argument('--segment', type=float, default=1.5,
+                        help='Max mm per pen-down move segment for straight lines (default: 1.5, smaller=straighter)')
     parser.add_argument('--output', '-o', type=str, default='gcode/svg_output.gcode',
                         help='Output file (default: gcode/svg_output.gcode)')
     parser.add_argument('--no-optimize', action='store_true',
@@ -759,6 +833,10 @@ def main():
                         help='Suppress output')
     parser.add_argument('--stats', action='store_true',
                         help='Show statistics only, do not write file')
+    parser.add_argument('--upload', action='store_true',
+                        help='Upload g-code to Scribit device after conversion')
+    parser.add_argument('--ip', type=str, default='192.168.240.1',
+                        help='Scribit device IP address (default: 192.168.240.1)')
 
     args = parser.parse_args()
 
@@ -787,7 +865,8 @@ def main():
             optimize=not args.no_optimize,
             resolution=args.resolution,
             aspect_x=args.aspect_x,
-            aspect_y=args.aspect_y
+            aspect_y=args.aspect_y,
+            segment_mm=args.segment
         )
 
         if not args.quiet:
@@ -812,6 +891,13 @@ def main():
                 print(f"\nG-code written to: {args.output}")
             else:
                 print(args.output)
+
+            # Upload to device if --upload flag is set
+            if args.upload:
+                gcode_content = '\n'.join(gcode_lines)
+                success = upload_gcode(gcode_content, args.ip, quiet=args.quiet)
+                if not success:
+                    return 1
 
     except Exception as e:
         print(f"Error: {e}")

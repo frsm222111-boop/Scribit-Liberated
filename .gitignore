@@ -6,6 +6,24 @@ Firmware/MK4duo/Mk4duoVersion.h
 # Build artifacts
 docker/builds/
 gui-app/resources/firmware/
+spiffs_build/
+spiffs_test/
+spiffs_test.bin
+tools/__pycache__/
+.vercel/
+_*.jpg
+_*.png
+_*.gcode
+# local scratch / debug / capture files (headless flashing & diagnostics)
+_*.py
+_*.svg
+_*.json
+_*.etl
+_*.txt
+_*.xml
+_*.ps1
+_*.log
+*-MusicMan*.xml
 
 .secrets
 

@@ -3,21 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Unbrickit — Scribit Control</title>
+  <title>Scribit Liberated — local control</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>Unbrickit</h1>
-      <p class="subtitle">Scribit Local Control</p>
+      <h1 class="title-art">
+        <svg class="title-svg" viewBox="0 0 640 112" role="img" aria-label="Scribit Liberated">
+          <defs>
+            <linearGradient id="ink-grad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#46c6f5"/>
+              <stop offset="0.5" stop-color="#bdeeff"/>
+              <stop offset="1" stop-color="#46c6f5"/>
+            </linearGradient>
+          </defs>
+          <text class="t-stroke" x="320" y="44" text-anchor="middle">SCRIBIT</text>
+          <text class="t-stroke t-2" x="320" y="98" text-anchor="middle">LIBERATED</text>
+          <text class="t-fill" x="320" y="44" text-anchor="middle">SCRIBIT</text>
+          <text class="t-fill t-2" x="320" y="98" text-anchor="middle">LIBERATED</text>
+        </svg>
+      </h1>
+      <p class="subtitle">Your robot. Your wall. No cloud, no company, no permission.</p>
+
+      <svg class="hero" viewBox="0 0 400 210" aria-hidden="true">
+        <!-- wall anchors -->
+        <path class="hw-anchor" d="M44 28 h30 M59 28 V16"/>
+        <path class="hw-anchor" d="M356 28 h-30 M341 28 V16"/>
+        <!-- support strings -->
+        <line class="hw-string" x1="59" y1="28" x2="200" y2="132"/>
+        <line class="hw-string" x1="341" y1="28" x2="200" y2="132"/>
+        <!-- the line-art the robot is drawing on the wall -->
+        <path class="hw-draw" d="M96 182 C 138 116, 176 200, 210 146 S 288 120, 320 178"/>
+        <!-- robot body + pen carousel -->
+        <circle class="hw-body" cx="200" cy="132" r="28"/>
+        <circle class="hw-ring" cx="200" cy="132" r="16"/>
+        <!-- four replaceable markers -->
+        <circle class="hw-pen p1" cx="200" cy="113" r="4.4"/>
+        <circle class="hw-pen p2" cx="219" cy="132" r="4.4"/>
+        <circle class="hw-pen p3" cx="200" cy="151" r="4.4"/>
+        <circle class="hw-pen p4" cx="181" cy="132" r="4.4"/>
+        <!-- pen tip to the wall -->
+        <line class="hw-tip" x1="200" y1="160" x2="200" y2="178"/>
+      </svg>
+
+      <p class="tagline">Abandoned by the company that sold it. Revived by the owners — open, local, and yours.</p>
+
       <div id="status-bar" class="status-bar">
         <span class="status-dot" id="status-dot"></span>
         <span id="status-text">Connecting…</span>
       </div>
     </header>
 
-    <section class="upload-section">
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="home">Home</button>
+      <span class="tab-group">① Set up</span>
+      <button class="tab" data-tab="calibration">Calibrate</button>
+      <button class="tab" data-tab="controls">Controls</button>
+      <button class="tab" data-tab="settings">Settings</button>
+      <span class="tab-group">② Create &amp; draw</span>
+      <button class="tab" data-tab="gallery">Gallery</button>
+      <button class="tab" data-tab="upload">Upload</button>
+      <button class="tab" data-tab="generative">Generative</button>
+      <button class="tab" data-tab="image">Image</button>
+      <button class="tab" data-tab="text">Text</button>
+      <button class="tab" data-tab="draw">Draw</button>
+      <button class="tab" data-tab="qr">QR</button>
+      <span class="tab-group">More</span>
+      <button class="tab" data-tab="about">Our Story</button>
+      <a class="tab-support" href="https://ko-fi.com/kshrx" target="_blank" rel="noopener">♥ Keep this alive</a>
+    </nav>
+
+    <section class="home" data-tab="home">
+      <svg viewBox="0 0 320 200" class="home-hero-svg" aria-hidden="true">
+        <circle cx="48" cy="28" r="6" fill="#cfe0f0"/>
+        <circle cx="272" cy="28" r="6" fill="#cfe0f0"/>
+        <g class="su-sway">
+          <line x1="48" y1="28" x2="160" y2="100" stroke="#6f8fb0" stroke-width="1.5"/>
+          <line x1="272" y1="28" x2="160" y2="100" stroke="#6f8fb0" stroke-width="1.5"/>
+          <rect x="132" y="84" width="56" height="46" rx="10" fill="rgba(70,198,245,0.08)" stroke="#46c6f5" stroke-width="2"/>
+          <circle cx="147" cy="104" r="3.6" fill="#6a3fb0"/>
+          <circle cx="160" cy="102" r="3.6" fill="#2faf5a"/>
+          <circle cx="173" cy="104" r="3.6" fill="#e23b3b"/>
+          <circle cx="160" cy="117" r="3.6" fill="#1a1a1a"/>
+        </g>
+        <path class="su-draw su-draw-a" d="M72 168 q88 -58 176 0" fill="none" stroke="#46c6f5" stroke-width="2.8" stroke-linecap="round"/>
+      </svg>
+      <h2 class="home-title">Scribit&nbsp;Liberated</h2>
+      <p class="home-tag">Your robot. Your wall. No cloud, no company, no permission.</p>
+      <p class="home-intro">A complete control panel for your Scribit, served straight from the robot — no app, no account. Calibrate your wall once, then draw anything: upload your own art, generate it, or pick from the gallery.</p>
+      <div class="home-cta-row">
+        <button id="home-start" class="btn primary">Get started</button>
+        <button class="btn secondary" data-goto="gallery">Browse the gallery</button>
+      </div>
+      <div class="home-cards">
+        <div class="home-card" data-goto="calibration"><div class="home-card-t">① Calibrate</div><div class="home-card-d">Measure your wall once</div></div>
+        <div class="home-card" data-goto="gallery"><div class="home-card-t">Gallery</div><div class="home-card-d">~70 ready-to-draw designs</div></div>
+        <div class="home-card" data-goto="upload"><div class="home-card-t">Upload</div><div class="home-card-d">Your own SVG / G-code</div></div>
+        <div class="home-card" data-goto="generative"><div class="home-card-t">Generative</div><div class="home-card-d">Spirographs, mazes &amp; more</div></div>
+      </div>
+    </section>
+
+    <section class="upload-section" data-tab="upload">
       <h2>Upload G-code</h2>
       <div
         id="drop-zone"
@@ -39,6 +126,43 @@
         <span id="file-size"></span>
       </div>
 
+      <div id="preview-canvas-wrap" class="preview-wrap hidden">
+        <h3>String Geometry Preview</h3>
+        <canvas id="preview-canvas" width="400" height="300"></canvas>
+      </div>
+
+      <div id="file-stats" class="stats-box hidden">
+        <div class="stat-row">
+          <span class="stat-label">Paths found</span>
+          <span class="stat-value" id="stat-paths">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Est. pen changes</span>
+          <span class="stat-value" id="stat-pen-changes">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Bounding box</span>
+          <span class="stat-value" id="stat-bbox">—</span>
+        </div>
+      </div>
+
+      <div id="color-assign" class="color-assign hidden">
+        <h3>Pen assignment</h3>
+        <p class="ca-hint">Map a whole color to a pen with the dropdowns — or turn on <b>Paint shapes by hand</b> below to click/drag individual shapes, including a <b>Skip</b> brush (⊘) to leave a background undrawn. The preview shows your real pen colors.</p>
+        <div id="color-assign-list" class="ca-list"></div>
+        <label class="paint-toggle"><input type="checkbox" id="paint-toggle"> Paint shapes by hand (click/drag to color individual shapes)</label>
+        <div id="paint-palette" class="paint-palette hidden"></div>
+        <div id="ca-preview" class="ca-preview"></div>
+      </div>
+
+      <div id="gcode-preview-wrap" class="gcode-preview-wrap hidden">
+        <div class="gcode-preview-header">
+          <span>G-code preview</span>
+          <button id="gcode-toggle" class="btn-toggle">Show more</button>
+        </div>
+        <pre id="gcode-preview" class="gcode-preview"></pre>
+      </div>
+
       <div class="options">
         <label class="toggle-row">
           <input type="checkbox" id="erase-mode">
@@ -52,17 +176,276 @@
         <span id="progress-text">0%</span>
       </div>
 
-      <button id="upload-btn" class="btn primary" disabled>Upload</button>
+      <button id="upload-btn" class="btn primary" disabled>SEND / DRAW NOW!</button>
     </section>
 
-    <section class="controls">
+    <section class="genart" data-tab="generative">
+      <h2>Generative Art</h2>
+      <p class="section-hint">Make original line-art for the robot to plot — no SVG needed. Tune it, shuffle for variations, send it to the wall.</p>
+
+      <div class="seg-toggle" id="gen-style">
+        <button type="button" class="seg active" data-style="spiro">Spiro</button>
+        <button type="button" class="seg" data-style="flow">Flow</button>
+        <button type="button" class="seg" data-style="maze">Maze</button>
+        <button type="button" class="seg" data-style="hilbert">Hilbert</button>
+        <button type="button" class="seg" data-style="waves">Waves</button>
+        <button type="button" class="seg" data-style="truchet">Truchet</button>
+      </div>
+
+      <div id="gen-params" class="gen-params"></div>
+
+      <div class="gen-row">
+        <label for="gen-size">Size (mm)</label>
+        <input type="number" id="gen-size" value="300" min="50" max="1500">
+        <button class="btn-mini fit-btn" data-target="gen-size" title="Fit to wall">⤢ Fit</button>
+        <button id="gen-dice" class="btn-mini" title="Randomize parameters">⚄ Shuffle</button>
+      </div>
+
+      <label class="gen-check"><input type="checkbox" id="gen-multicolor"> Use the 4 marker colors</label>
+
+      <div class="gen-preview-wrap">
+        <canvas id="gen-canvas" width="320" height="320"></canvas>
+        <div id="gen-info" class="gen-info">—</div>
+      </div>
+
+      <div class="gen-actions">
+        <button id="gen-download" class="btn secondary">Download G-code</button>
+        <button id="gen-send" class="btn primary">Send to Robot</button>
+      </div>
+    </section>
+
+    <section class="imgart" data-tab="image">
+      <h2>Image → Line Art</h2>
+      <p class="section-hint">Turn a photo or logo into plottable lines. Hatching fills solid areas and shades photos with closely-spaced lines; outline traces edges.</p>
+
+      <div
+        id="img-drop"
+        class="drop-zone"
+        onclick="document.getElementById('img-input').click()"
+      >
+        <div class="drop-zone-content">
+          <p>Drop an image (PNG/JPG), or click to browse</p>
+          <span class="drop-hint">.png .jpg .jpeg .gif .bmp</span>
+        </div>
+        <input type="file" id="img-input" accept="image/*" hidden>
+      </div>
+
+      <div id="img-controls" class="hidden">
+        <div class="seg-toggle" id="img-mode">
+          <button type="button" class="seg active" data-mode="hatch">Hatching</button>
+          <button type="button" class="seg" data-mode="outline">Outline</button>
+          <button type="button" class="seg" data-mode="both">Both</button>
+        </div>
+
+        <div class="gen-row"><label for="img-fill">Fill style</label>
+          <select id="img-fill" class="set-input">
+            <option value="horizontal">Horizontal lines</option>
+            <option value="vertical">Vertical lines</option>
+            <option value="diagonal">Diagonal lines</option>
+            <option value="grid">Grid</option>
+            <option value="crosshatch">Crosshatch (diagonal)</option>
+            <option value="stipple">Stipple (dots)</option>
+          </select>
+        </div>
+
+        <div id="img-params" class="gen-params"></div>
+
+        <div id="img-palette" class="img-palette hidden"></div>
+
+        <label class="gen-check"><input type="checkbox" id="img-invert"> Invert (draw light areas)</label>
+        <label class="gen-check"><input type="checkbox" id="img-frame"> Draw a border frame</label>
+
+        <div class="gen-row">
+          <label for="img-size">Size (mm)</label>
+          <input type="number" id="img-size" value="300" min="50" max="1500">
+          <button class="btn-mini fit-btn" data-target="img-size" title="Fit to wall">⤢ Fit</button>
+        </div>
+
+        <div class="gen-preview-wrap">
+          <canvas id="img-canvas" width="320" height="320"></canvas>
+          <div id="img-info" class="gen-info">—</div>
+        </div>
+
+        <div class="gen-actions">
+          <button id="img-download" class="btn secondary">Download G-code</button>
+          <button id="img-send" class="btn primary">Send to Robot</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="textart" data-tab="text">
+      <h2>Text → Line Art</h2>
+      <p class="section-hint">Type a message and the robot writes it — outlined letters or filled.</p>
+
+      <textarea id="text-input" rows="2" placeholder="Type your text…">HELLO</textarea>
+
+      <div class="seg-toggle" id="text-mode">
+        <button type="button" class="seg active" data-mode="outline">Outline</button>
+        <button type="button" class="seg" data-mode="fill">Filled</button>
+      </div>
+
+      <div class="gen-row">
+        <label for="text-font">Font</label>
+        <select id="text-font">
+          <option value="sans-serif">Sans</option>
+          <option value="serif">Serif</option>
+          <option value="monospace">Mono</option>
+        </select>
+        <label class="gen-check" style="margin:0"><input type="checkbox" id="text-bold" checked> Bold</label>
+      </div>
+
+      <div class="gen-row">
+        <label for="text-size">Height (mm)</label>
+        <input type="number" id="text-size" value="120" min="20" max="1000">
+        <button class="btn-mini fit-btn" data-target="text-size" title="Fit to wall">⤢ Fit</button>
+      </div>
+
+      <div class="gen-preview-wrap">
+        <canvas id="text-canvas" width="320" height="180"></canvas>
+        <div id="text-info" class="gen-info">—</div>
+      </div>
+
+      <div class="gen-actions">
+        <button id="text-download" class="btn secondary">Download G-code</button>
+        <button id="text-send" class="btn primary">Send to Robot</button>
+      </div>
+    </section>
+
+    <section class="gallery" data-tab="gallery">
+      <h2>Design Gallery</h2>
+      <p class="section-hint">Ready-to-plot designs. Pick a category, choose one, set the size, send it to the wall.</p>
+      <div id="gallery-cats" class="gallery-cats"></div>
+      <div id="gallery-grid" class="gallery-grid"></div>
+      <div id="gallery-detail" class="gallery-detail hidden">
+        <div class="gen-preview-wrap">
+          <canvas id="gallery-canvas" width="320" height="320"></canvas>
+          <div id="gallery-info" class="gen-info">—</div>
+        </div>
+        <div class="gen-row">
+          <label for="gallery-size">Size (mm)</label>
+          <input type="number" id="gallery-size" value="300" min="50" max="1500">
+          <button class="btn-mini fit-btn" data-target="gallery-size" title="Fit to wall">⤢ Fit</button>
+        </div>
+        <div class="gen-actions">
+          <button id="gallery-download" class="btn secondary">Download G-code</button>
+          <button id="gallery-send" class="btn primary">Send to Robot</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="drawpad" data-tab="draw">
+      <h2>Freehand Draw</h2>
+      <p class="section-hint">Sketch with your mouse or finger — the robot plots exactly what you draw.</p>
+      <div class="draw-toolbar">
+        <button id="draw-undo" class="btn-mini">↶ Undo</button>
+        <button id="draw-clear" class="btn-mini">✕ Clear</button>
+      </div>
+      <div class="gen-preview-wrap">
+        <canvas id="draw-canvas" width="340" height="340" class="draw-canvas"></canvas>
+        <div id="draw-info" class="gen-info">—</div>
+      </div>
+      <div class="gen-row">
+        <label for="draw-size">Size (mm)</label>
+        <input type="number" id="draw-size" value="300" min="50" max="1500">
+        <button class="btn-mini fit-btn" data-target="draw-size" title="Fit to wall">⤢ Fit</button>
+      </div>
+      <div class="gen-actions">
+        <button id="draw-download" class="btn secondary">Download G-code</button>
+        <button id="draw-send" class="btn primary">Send to Robot</button>
+      </div>
+    </section>
+
+    <section class="qrart" data-tab="qr">
+      <h2>QR Code</h2>
+      <p class="section-hint">Turn a link, message, or WiFi into a scannable QR code the robot draws.</p>
+      <div class="gen-row">
+        <label for="qr-text">Text / URL</label>
+        <input type="text" id="qr-text" value="https://github.com/karimi/unbrickit" maxlength="300">
+      </div>
+      <div class="gen-preview-wrap">
+        <canvas id="qr-canvas" width="320" height="320"></canvas>
+        <div id="qr-info" class="gen-info">—</div>
+      </div>
+      <div class="gen-row">
+        <label for="qr-size">Size (mm)</label>
+        <input type="number" id="qr-size" value="300" min="50" max="1500">
+        <button class="btn-mini fit-btn" data-target="qr-size" title="Fit to wall">⤢ Fit</button>
+      </div>
+      <div class="gen-actions">
+        <button id="qr-download" class="btn secondary">Download G-code</button>
+        <button id="qr-send" class="btn primary">Send to Robot</button>
+      </div>
+    </section>
+
+    <section class="settings" data-tab="settings">
+      <h2>Settings</h2>
+
+      <h3 class="settings-group">Defaults &amp; units</h3>
+      <div class="gen-row"><label for="set-units">Units</label>
+        <select id="set-units" class="set-input"><option value="mm">mm</option><option value="in">inches</option></select></div>
+      <div class="gen-row"><label for="set-size">Default drawing size (mm)</label>
+        <input type="number" id="set-size" class="set-input" min="50" max="1500"></div>
+      <div class="gen-row"><label for="set-wall">Preview wall color</label>
+        <input type="color" id="set-wall" class="set-input" title="Tint drawing previews to match your wall so dark markers are visible"></div>
+
+      <h3 class="settings-group">Speed &amp; smoothness</h3>
+      <div class="gen-row"><label for="set-feed">Draw speed (mm/min)</label>
+        <input type="number" id="set-feed" class="set-input" min="200" max="3000" step="50"></div>
+      <div class="gen-row"><label for="set-seg">Segment length (mm)</label>
+        <input type="number" id="set-seg" class="set-input" min="0.5" max="5" step="0.1"></div>
+      <p class="settings-hint">Smaller segment = straighter curves but more moves (slower). Default 1.5 mm. Lower speed = neater lines.</p>
+
+      <h3 class="settings-group">Advanced — pen tuning</h3>
+      <div class="gen-row"><label for="set-pen">Pen press depth</label>
+        <input type="number" id="set-pen" class="set-input" min="10" max="60" step="1"></div>
+      <div class="gen-row"><label for="set-erase">Eraser offset (mm)</label>
+        <input type="number" id="set-erase" class="set-input" min="-150" max="0" step="1"></div>
+      <p class="settings-hint">Only change these if your unit's geometry differs. Defaults: depth 30, eraser −77 mm.</p>
+
+      <h3 class="settings-group">Connection &amp; housekeeping</h3>
+      <div class="gen-row"><label for="set-ip">Robot IP override</label>
+        <input type="text" id="set-ip" class="set-input" placeholder="auto"></div>
+      <label class="toggle-row"><input type="checkbox" id="set-confirm"><span class="toggle-label">Confirm before sending to robot</span></label>
+      <div class="settings-actions">
+        <button id="set-setup" class="btn secondary">Re-run setup wizard</button>
+        <button id="set-export" class="btn secondary">Export settings</button>
+        <button id="set-import" class="btn secondary">Import settings</button>
+        <button id="set-reset" class="btn danger">Reset all saved data</button>
+        <input type="file" id="set-import-file" accept="application/json" hidden>
+      </div>
+      <p class="settings-hint" id="set-note"></p>
+    </section>
+
+    <section class="controls" data-tab="controls">
       <h2>Device Controls</h2>
       <div class="button-grid">
-        <button id="btn-home" class="btn secondary">Home Pen (G77)</button>
+        <button id="btn-home" class="btn secondary">Home Pen</button>
         <button id="btn-pause" class="btn secondary" disabled>Pause</button>
         <button id="btn-resume" class="btn secondary" disabled>Resume</button>
         <button id="btn-stop" class="btn danger" disabled>Stop</button>
       </div>
+      <button id="btn-estop" class="btn danger estop">■ EMERGENCY STOP</button>
+      <p class="settings-hint"><b>Stop</b> aborts the current move and keeps the robot held in place.
+        <b>Emergency Stop</b> also cuts motor power to halt a jam/grinding — the robot is no longer
+        held, so <b>support it first; it can drop.</b></p>
+
+      <div class="pen-rack-panel">
+        <h3 class="pen-rack-title">Pen Rack</h3>
+        <p class="pen-rack-hint">Set the color you loaded in each carousel slot. Drawings route each color to the nearest loaded pen.</p>
+        <div id="pen-rack" class="pen-rack"></div>
+      </div>
+
+      <div class="testpattern-panel">
+        <h3 class="pen-rack-title">Calibration Test</h3>
+        <p class="pen-rack-hint">Draws a 120 mm square + inscribed circle + center cross. The square should be square and the circle round — if not, re-check your calibration.</p>
+        <button id="btn-testpattern" class="btn secondary">Draw Test Pattern</button>
+      </div>
+
+      <label class="toggle-row pen-invert-row">
+        <input type="checkbox" id="pen-invert">
+        <span class="toggle-label">Invert pen rotation</span>
+        <span class="toggle-hint">if the carousel turns the wrong way when changing pens</span>
+      </label>
 
       <div id="device-info" class="device-info hidden">
         <h3>Device Info</h3>
@@ -83,41 +466,152 @@
       </div>
     </section>
 
-    <section class="calibration">
-      <h2>Manual Calibration Helper</h2>
-      <p class="section-hint">Enter your wall dimensions to calculate starting position</p>
-      <div class="calib-form">
-        <div class="input-row">
-          <label>Anchor distance (mm)</label>
-          <input type="number" id="calib-anchor" value="2250" min="500" max="5000">
-        </div>
-        <div class="input-row">
-          <label>Left string length (mm)</label>
-          <input type="number" id="calib-left" value="1270" min="500" max="5000">
-        </div>
-        <div class="input-row">
-          <label>Right string length (mm)</label>
-          <input type="number" id="calib-right" value="1270" min="500" max="5000">
-        </div>
-        <div class="input-row">
-          <label>Wall height (mm, optional)</label>
-          <input type="number" id="calib-height" placeholder="e.g. 1500">
-        </div>
-        <button id="calib-generate" class="btn secondary">Generate Starting G-code</button>
+    <section class="calibration" data-tab="calibration">
+      <h2>Calibration</h2>
+      <p class="section-hint">Tell the robot where it's hanging so drawings land in the right place and size. Measure once per wall.</p>
+
+      <div class="seg-toggle calib-unit" id="calib-unit">
+        <button type="button" class="seg active" data-unit="mm">mm</button>
+        <button type="button" class="seg" data-unit="in">inches</button>
       </div>
-      <pre id="calib-output" class="gcode-output hidden"></pre>
-      <button id="calib-upload" class="btn primary hidden">Send to Device</button>
+
+      <div class="calib-saved">
+        <select id="calib-wall-select"><option value="">— saved walls —</option></select>
+        <button id="calib-wall-load" class="btn-mini">Load</button>
+        <button id="calib-wall-delete" class="btn-mini danger">✕</button>
+      </div>
+
+      <div class="calib-step">
+        <label class="step-label"><span class="step-num">1</span> Anchor distance</label>
+        <input type="number" id="calib-anchor" value="2250" min="300" max="6000">
+        <span class="hint">Tape measure between the two anchor points.</span>
+      </div>
+
+      <div class="calib-step">
+        <label class="step-label"><span class="step-num">2</span> Pen position</label>
+        <div class="seg-toggle" id="calib-method">
+          <button type="button" class="seg active" data-method="position">Offset + drop</button>
+          <button type="button" class="seg" data-method="strings">String lengths</button>
+        </div>
+      </div>
+
+      <div id="method-position">
+        <div class="input-row">
+          <label>Horizontal from LEFT anchor</label>
+          <input type="number" id="calib-xoff" placeholder="center = anchor ÷ 2">
+        </div>
+        <div class="input-row">
+          <label>Vertical drop below anchor line</label>
+          <input type="number" id="calib-drop" placeholder="e.g. 600">
+        </div>
+      </div>
+
+      <div id="method-strings" class="hidden">
+        <div class="input-row">
+          <label>Left string length</label>
+          <input type="number" id="calib-left" min="100" max="6000">
+        </div>
+        <div class="input-row">
+          <label>Right string length</label>
+          <input type="number" id="calib-right" min="100" max="6000">
+        </div>
+      </div>
+
+      <div class="calib-step">
+        <label class="step-label"><span class="step-num">3</span> Canvas size <span class="hint">(optional)</span></label>
+        <div class="input-row">
+          <label>Canvas width</label>
+          <input type="number" id="calib-canvas-w" placeholder="e.g. 800" min="0">
+        </div>
+        <div class="input-row">
+          <label>Canvas height</label>
+          <input type="number" id="calib-canvas-h" placeholder="e.g. 600" min="0">
+        </div>
+        <span class="hint">Your drawing area on the wall. Drawings bigger than this — or that would climb into the anchors — are blocked before they run. Leave blank to disable.</span>
+      </div>
+
+      <div class="calib-viz">
+        <svg id="calib-diagram" viewBox="0 0 300 210" aria-label="calibration diagram"></svg>
+        <div id="calib-computed" class="calib-computed">—</div>
+      </div>
+
+      <div id="calib-msg" class="calib-msg hidden"></div>
+
+      <div class="calib-actions">
+        <input type="text" id="calib-wall-name" placeholder="Wall name (to save)">
+        <button id="calib-save" class="btn secondary">Save</button>
+        <button id="calib-apply" class="btn primary">Apply</button>
+      </div>
+      <button id="calib-center" class="btn secondary calib-center-btn">⊕ Center robot on wall</button>
+      <p class="section-hint">Moves the robot to the midpoint between the anchors — the most accurate spot to draw (equal strings = least distortion). Drawings then center there.</p>
+    </section>
+
+    <section class="about" data-tab="about">
+      <div class="about-hero">
+        <p class="about-kicker">Our Story</p>
+        <h2 class="about-head">The company quit.<br><span>Your Scribit didn't.</span></h2>
+        <p class="about-lead">Scribit was sold as a connected wall-drawing robot — and it only ever worked through the maker's cloud. Then they moved on. The app and servers went dark, the website lapsed, and thousands of robots people paid hundreds of dollars for turned into bricks overnight. No support. No refunds. No way to use the thing you already owned.</p>
+      </div>
+
+      <div class="story-grid">
+        <div class="story-card">
+          <span class="story-no">01</span>
+          <h3>What we did</h3>
+          <p>We cut the cord. <b>Scribit Liberated</b> reflashes your robot to run <b>100% locally</b> — no cloud, no account, no permission. We fixed the drawing so lines come out straight, rebuilt the entire control panel in your browser, and added tools the original never had: generative art, photo-to-line-art, text plotting, and a guided calibration wizard.</p>
+        </div>
+        <div class="story-card">
+          <span class="story-no">02</span>
+          <h3>No more limits</h3>
+          <p>The factory nail-template is gone. Mount the anchors at <b>any distance</b> that fits your wall and just measure it once. Your robot, your space, your rules — the way it should have been from day one.</p>
+        </div>
+        <div class="story-card">
+          <span class="story-no">03</span>
+          <h3>Where we stand</h3>
+          <p><b>Open source. Pay what you want.</b> No lock-in, no telemetry, nothing phoning home. If a company can brick something you bought, you never really owned it — so we gave it back. They bet you'd give up. You didn't.</p>
+        </div>
+      </div>
+
+      <p class="about-credit">Built on the open-source <a href="https://github.com/karimi/unbrickit" target="_blank">UnBrickIt</a> project — and on every owner who refused to throw a working robot in a drawer. <b>Every Scribit deserves to keep drawing.</b></p>
+
+      <div class="donate-card">
+        <p class="donate-kicker">Pay what you want</p>
+        <h3>Free &amp; open — forever.</h3>
+        <p class="donate-body">Scribit Liberated is open source and always will be. It also took hundreds of hours to reverse‑engineer and rebuild. If it saved your robot, chip in what it's worth to you.</p>
+        <div class="donate-actions">
+          <a class="btn primary" href="https://ko-fi.com/kshrx" target="_blank" rel="noopener">💛 Support this project</a>
+          <a class="btn secondary" href="https://unbrickit.com" target="_blank" rel="noopener">🙏 Support the original creator</a>
+        </div>
+      </div>
     </section>
 
     <footer>
-      <a href="https://github.com/karimi/unbrickit" target="_blank">View on GitHub</a>
+      <p class="mission">Independently revived and <b>actively maintained</b> by the community — no cloud, no lock-in. Every Scribit deserves to keep drawing.</p>
+      <a href="https://github.com/karimi/unbrickit" target="_blank">Built on UnBrickIt · open source on GitHub</a>
+      <span class="separator">·</span>
+      <a href="https://ko-fi.com/kshrx" target="_blank" rel="noopener">Support ♥</a>
+      <span class="separator">·</span>
+      <a href="#" id="setup-open">Setup guide</a>
       <span class="separator">·</span>
       <span id="connection-info">Checking connection…</span>
     </footer>
   </div>
 
+  <div id="setup-modal" class="setup-modal hidden">
+    <div class="setup-card">
+      <div class="setup-num" id="setup-num"></div>
+      <h3 id="setup-title"></h3>
+      <div class="setup-body" id="setup-body"></div>
+      <div class="setup-nav">
+        <button id="setup-skip" class="btn-mini">Skip</button>
+        <button id="setup-back" class="btn secondary">Back</button>
+        <button id="setup-next" class="btn primary">Next</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
+  <script src="qrcode.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

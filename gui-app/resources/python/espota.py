@@ -80,8 +80,11 @@ def update_progress(progress):
 def serve(remoteAddr, localAddr, remotePort, localPort, password, filename, command = FLASH):
   # Create a TCP/IP socket
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  server_address = (localAddr, localPort)
-  logging.info('Starting on %s:%s', str(server_address[0]), str(server_address[1]))
+  # Listen on ALL interfaces (0.0.0.0) so the ESP's connect-back is accepted regardless of which
+  # interface/IP Windows steers it to on a multi-homed PC. The ESP still dials the invitation's
+  # source IP (pinned to localAddr by the UDP bind below), so this only widens what we accept.
+  server_address = ('', localPort)
+  logging.info('Starting on %s:%s (accepting on all interfaces)', str(localAddr), str(localPort))
   try:
     sock.bind(server_address)
     sock.listen(1)
@@ -105,6 +108,13 @@ def serve(remoteAddr, localAddr, remotePort, localPort, password, filename, comm
   while (inv_trys < 10):
     inv_trys += 1
     sock2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # Multi-homed fix: bind the invitation socket to the host IP so its SOURCE address is the
+    # robot-network IP. The ESP connects back to the invitation's source IP; on a PC with two
+    # Wi-Fi adapters Windows may otherwise source it from the other adapter, and the robot then
+    # tries to reach an unreachable IP -> "No response from device".
+    if localAddr:
+      try: sock2.bind((localAddr, 0))
+      except Exception: pass
     remote_address = (remoteAddr, int(remotePort))
     try:
       sent = sock2.sendto(message.encode(), remote_address)
@@ -162,7 +172,7 @@ def serve(remoteAddr, localAddr, remotePort, localPort, password, filename, comm
 
   logging.info('Waiting for device...')
   try:
-    sock.settimeout(10)
+    sock.settimeout(30)
     connection, client_address = sock.accept()
     sock.settimeout(None)
     connection.settimeout(None)

@@ -14,7 +14,10 @@ SISerialManager::SISerialManager() :
     m_newIMUDataAvailable(false), 
     m_startingPositionLine(""),
     m_smartCylinder(true),
-    m_penSensitivity(true)    
+    m_penSensitivity(true),
+    m_rawStream(false),
+    m_rawStreamDone(false),
+    m_samdLogHead(0)
 {};
 
 int SISerialManager::begin()
@@ -138,6 +141,19 @@ bool SISerialManager::loadNextLine()
 #endif
     else
     {
+        //Browser-driven RAM stream: never read from the file. When the buffer is
+        //empty just wait for the next /gcode line. Only end (and let the device go
+        //back to IDLE) once the browser has signalled it is finished.
+        if (m_rawStream)
+        {
+            if (m_rawStreamDone)
+            {
+                m_rawStream = false;
+                m_streamEnded = true;
+            }
+            return false;
+        }
+
         //Do not load next line of stream if stream ended or pause
         if (isStreamEnded() || m_isPaused)
         {
@@ -227,6 +243,13 @@ SIMKOperation SISerialManager::loop()
 #ifdef SI_ECHO_GCODE
             SIMQTT.debug(TAG, String("R: \"") + samdSerialBuffer + "\"", 9);
 #endif
+            // Capture interesting SAMD replies for the /samd debug endpoint
+            // (skip the idle "wait" and bare "ok" spam so the log stays useful).
+            if (strstr(samdSerialBuffer, "wait") == nullptr && strcmp(samdSerialBuffer, "ok") != 0)
+            {
+                m_samdLog[m_samdLogHead] = samdSerialBuffer;
+                m_samdLogHead = (m_samdLogHead + 1) % SI_SAMD_LOG_N;
+            }
             //OK-----------------------------------------------------
             if (strstr(samdSerialBuffer, "ok") != nullptr) //Printer ready for line
             {
@@ -406,14 +429,58 @@ void SISerialManager::stopStream()
 {
     //Signal stream as ended
     m_streamEnded = true;
+    //Clear any browser RAM stream
+    m_rawStream = false;
+    m_rawStreamDone = false;
     //If file still open close it
     if (m_inFile)
     {
         m_inFile.close();
     }
+    //Drop any queued lines so a stopped print doesn't keep draining
+    String s;
+    while (!extraLines.empty())
+        extraLines.remove(&s);
     //Reset pause flag
     if (m_isPaused)
         m_isPaused = false;
+}
+
+void SISerialManager::beginRawStream()
+{
+    //Empty buffers
+    String s;
+    while (!sentLines.empty())
+        sentLines.remove(&s);
+    while (!extraLines.empty())
+        extraLines.remove(&s);
+
+    m_isPaused = false;
+    m_resend = 0;
+    m_waitingForAck = false;
+    m_lineNumber = 0;
+    m_rawStreamDone = false;
+    m_rawStream = true;
+    //Keep stream "open" so the main loop treats us as printing until we finish
+    m_streamEnded = false;
+}
+
+void SISerialManager::endRawStream()
+{
+    //Mark finished; loadNextLine() ends the stream once the buffer drains
+    m_rawStreamDone = true;
+}
+
+String SISerialManager::dumpSamdLog()
+{
+    String out = "";
+    for (uint8_t i = 0; i < SI_SAMD_LOG_N; i++)
+    {
+        uint8_t idx = (m_samdLogHead + i) % SI_SAMD_LOG_N;   //oldest first
+        if (m_samdLog[idx].length() > 0)
+            out += m_samdLog[idx] + "\n";
+    }
+    return out;
 }
 
 void SISerialManager::setPause(bool state)

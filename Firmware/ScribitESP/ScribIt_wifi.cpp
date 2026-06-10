@@ -5,6 +5,7 @@
 #include "SIConfig.hpp"
 #include "ScribIt.hpp"
 #include "FirmwareVersion.h"
+#include "web_ui.h"
 
 void replyBadRequest(WiFiClient &client, const char *error, const uint8_t t_ID[6])
 {
@@ -319,7 +320,9 @@ void ScribIt::handleHTTPRequests()
         }
         else
         {
-            //Read g-code content
+            // Run the uploaded g-code as-is. (The converter emits its own correct
+            // pen-home; the old auto-prepended header homed to the wrong Z and
+            // stalled every pen-down — removed.)
             String gcode = "";
             uint16_t bytesRead = 0;
             while (bytesRead < contentLen && client.available())
@@ -334,6 +337,7 @@ void ScribIt::handleHTTPRequests()
             {
                 client.println("HTTP/1.1 200 OK");
                 client.println("Content-Type: application/json");
+                client.println("Access-Control-Allow-Origin: *");
                 client.println();
                 client.printf("{\"status\":\"uploaded\",\"size\":%d}\n", bytesRead);
 
@@ -345,6 +349,7 @@ void ScribIt::handleHTTPRequests()
             {
                 client.println("HTTP/1.1 500 Internal Server Error");
                 client.println("Content-Type: application/json");
+                client.println("Access-Control-Allow-Origin: *");
                 client.println();
                 client.println("{\"error\":\"SPIFFS write failed\"}");
             }
@@ -465,14 +470,61 @@ void ScribIt::handleHTTPRequests()
                 gcodeCmd += c;
                 bytesRead++;
             }
-            sm.addLineToStream(gcodeCmd.c_str());
+            // Report whether the line was accepted so the browser can apply
+            // backpressure (the extra-line buffer is small; a "full" reply means retry).
+            bool accepted = sm.addLineToStream(gcodeCmd.c_str());
 
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: application/json");
             client.println("Access-Control-Allow-Origin: *");
             client.println();
-            client.printf("{\"status\":\"queued\",\"len\":%d}\\n", bytesRead);
+            client.printf("{\"status\":\"%s\",\"len\":%d}\n", accepted ? "queued" : "full", bytesRead);
         }
+    }
+    else if (path == "/stream/start" && method == "POST")
+    {
+        // Begin a browser-driven RAM stream (bypasses SPIFFS entirely).
+        if (m_state != SI_IDLE)
+        {
+            client.println("HTTP/1.1 409 Conflict");
+            client.println("Content-Type: application/json");
+            client.println("Access-Control-Allow-Origin: *");
+            client.println();
+            client.println("{\"error\":\"Device not idle\"}");
+        }
+        else
+        {
+            sm.beginRawStream();
+            setState(SI_PRINTING);
+
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-Type: application/json");
+            client.println("Access-Control-Allow-Origin: *");
+            client.println();
+            client.println("{\"status\":\"streaming\"}");
+        }
+    }
+    else if (path == "/stream/end" && method == "POST")
+    {
+        // Browser finished sending; device returns IDLE once the buffer drains.
+        sm.endRawStream();
+
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: application/json");
+        client.println("Access-Control-Allow-Origin: *");
+        client.println();
+        client.println("{\"status\":\"ending\"}");
+    }
+    else if (path == "/samd" && method == "GET")
+    {
+        // Debug: recent interesting replies from the SAMD21 motion controller.
+        // Lets us see how it responds to G101/G100/M777 (pen-select, IMU, errors).
+        String log = sm.dumpSamdLog();
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/plain");
+        client.println("Access-Control-Allow-Origin: *");
+        client.println();
+        client.print(log);
     }
     else if (path == "/stop" && method == "POST")
     {
@@ -487,7 +539,7 @@ void ScribIt::handleHTTPRequests()
     }
     else if (path.startsWith("/"))
     {
-        // Static file from SPIFFS /data/ directory
+        // Static file: serve embedded web UI from flash first, then SPIFFS /data/
         String filePath = path;
         if (filePath.indexOf("?") > 0)
             filePath = filePath.substring(0, filePath.indexOf("?"));
@@ -496,34 +548,65 @@ void ScribIt::handleHTTPRequests()
         if (filePath == "/" || filePath == "")
             filePath = "/index.html";
 
-        String spiffsPath = "/data" + filePath;
-
-        File file = SPIFFS.open(spiffsPath.c_str(), "r");
-        if (!file)
+        // 1) Embedded web UI (no SPIFFS dependency - see web_ui.h / tools/gen_web_ui.py)
+        const EmbeddedFile *ef = findEmbeddedFile(filePath.c_str());
+        if (ef != nullptr)
         {
-            client.println("HTTP/1.1 404 Not Found");
-            client.println("Content-Type: text/plain");
-            client.println();
-            client.println("File not found");
+            // Embedded assets are gzip-compressed in flash (see tools/gen_web_ui.py) to fit the
+            // OTA app partition; advertise the encoding so the browser inflates them.
+            // no-cache => the browser revalidates each load, so a freshly-flashed UI shows up
+            // immediately instead of a stale cached copy.
+            if (ef->gz)
+                client.printf("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Encoding: gzip\r\nContent-Length: %u\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+                              ef->contentType, (unsigned)ef->len);
+            else
+                client.printf("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %u\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+                              ef->contentType, (unsigned)ef->len);
+            // Stream from PROGMEM in chunks
+            uint8_t buf[512];
+            size_t remaining = ef->len;
+            const uint8_t *src = ef->data;
+            while (remaining > 0)
+            {
+                size_t n = remaining < sizeof(buf) ? remaining : sizeof(buf);
+                memcpy_P(buf, src, n);
+                client.write(buf, n);
+                src += n;
+                remaining -= n;
+            }
         }
         else
         {
-            // Guess content type from extension
-            const char *ct = "text/plain";
-            if (spiffsPath.endsWith(".html")) ct = "text/html";
-            else if (spiffsPath.endsWith(".css"))  ct = "text/css";
-            else if (spiffsPath.endsWith(".js"))   ct = "application/javascript";
-            else if (spiffsPath.endsWith(".json")) ct = "application/json";
-            else if (spiffsPath.endsWith(".png"))   ct = "image/png";
-            else if (spiffsPath.endsWith(".jpg") || spiffsPath.endsWith(".jpeg")) ct = "image/jpeg";
-            else if (spiffsPath.endsWith(".gif"))  ct = "image/gif";
-            else if (spiffsPath.endsWith(".svg"))  ct = "image/svg+xml";
-            else if (spiffsPath.endsWith(".ico"))  ct = "image/x-icon";
+            // 2) Fallback: static file from SPIFFS /data/ directory
+            String spiffsPath = "/data" + filePath;
 
-            client.printf("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n",
-                          ct, file.size());
-            client.write((const uint8_t *)file.readString().c_str(), file.size());
-            file.close();
+            File file = SPIFFS.open(spiffsPath.c_str(), "r");
+            if (!file)
+            {
+                client.println("HTTP/1.1 404 Not Found");
+                client.println("Content-Type: text/plain");
+                client.println();
+                client.println("File not found");
+            }
+            else
+            {
+                // Guess content type from extension
+                const char *ct = "text/plain";
+                if (spiffsPath.endsWith(".html")) ct = "text/html";
+                else if (spiffsPath.endsWith(".css"))  ct = "text/css";
+                else if (spiffsPath.endsWith(".js"))   ct = "application/javascript";
+                else if (spiffsPath.endsWith(".json")) ct = "application/json";
+                else if (spiffsPath.endsWith(".png"))   ct = "image/png";
+                else if (spiffsPath.endsWith(".jpg") || spiffsPath.endsWith(".jpeg")) ct = "image/jpeg";
+                else if (spiffsPath.endsWith(".gif"))  ct = "image/gif";
+                else if (spiffsPath.endsWith(".svg"))  ct = "image/svg+xml";
+                else if (spiffsPath.endsWith(".ico"))  ct = "image/x-icon";
+
+                client.printf("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n",
+                              ct, file.size());
+                client.write((const uint8_t *)file.readString().c_str(), file.size());
+                file.close();
+            }
         }
     }
     else

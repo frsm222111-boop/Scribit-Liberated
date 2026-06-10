@@ -8,6 +8,7 @@
 #define SM_PRINTER_ENDLINE 0x0A
 //#define PAUSE_AFTER_Z
 #define SI_MAX_GCODE_LINE_LEN 128
+#define SI_SAMD_LOG_N 20   // ring buffer of recent interesting SAMD replies (for /samd debug)
 
 enum SIMKOperation
 {
@@ -46,6 +47,10 @@ private:
     bool m_isIMUWorking;
     bool m_penSensitivity;
     bool m_smartCylinder;
+    bool m_rawStream;      //True while a browser-driven RAM stream (/stream + /gcode) is active
+    bool m_rawStreamDone;  //True once the browser has signalled it sent the last line
+    String m_samdLog[SI_SAMD_LOG_N];   //Recent interesting SAMD reply lines (debug)
+    uint8_t m_samdLogHead;             //Next write index into m_samdLog
 #ifdef SI_DEBUG_BUILD
     uint32_t md_resends;
 #endif
@@ -193,6 +198,32 @@ public:
      * @brief Stops Gcode stream to SAMD21
      */
     void stopStream();
+
+    /**
+     * @brief Begins a browser-driven RAM stream: lines pushed via addLineToStream
+     * are drained to the SAMD21 with the normal ack flow control, without touching
+     * SPIFFS. The stream stays "open" (will not revert to IDLE) until endRawStream()
+     * is called and the buffer has drained.
+     */
+    void beginRawStream();
+
+    /**
+     * @brief Signals the browser has sent the last line of a RAM stream. Once the
+     * extra-line buffer empties, the stream is marked ended and the device returns IDLE.
+     */
+    void endRawStream();
+
+    /**
+     * @brief True while a browser-driven RAM stream is active.
+     */
+    bool isRawStreaming() { return m_rawStream; }
+
+    /**
+     * @brief Returns recent interesting SAMD21 reply lines (oldest first), for the
+     * /samd debug endpoint. Lets us see how the motion controller responds to
+     * commands like G101/G100/M777 (pen-select, IMU status, errors).
+     */
+    String dumpSamdLog();
 
     /**
      * @brief Pauses or unpauses the actual stream of commands towards SAMD21

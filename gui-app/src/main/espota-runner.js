@@ -151,7 +151,7 @@ async function uploadAllFirmware(options, onProgress) {
 
   // 1. Upload ESP32 firmware (no special flags)
   if (onProgress) {
-    onProgress({ type: 'info', data: '1/3 Uploading ESP32 firmware...\n' })
+    onProgress({ type: 'info', data: '1/2 Uploading ESP32 firmware...\n' })
   }
 
   const esp32Result = await uploadFirmware({
@@ -173,7 +173,7 @@ async function uploadAllFirmware(options, onProgress) {
 
   // 2. Upload SAMD21 firmware (companion chip, use -c flag)
   if (onProgress) {
-    onProgress({ type: 'info', data: '2/3 Uploading SAMD21 firmware (companion chip)...\n' })
+    onProgress({ type: 'info', data: '2/2 Uploading SAMD21 firmware (companion chip)...\n' })
   }
 
   const samdResult = await uploadFirmware({
@@ -194,28 +194,14 @@ async function uploadAllFirmware(options, onProgress) {
     }
   }
 
-  // 3. Upload ESP32 partitions (SPIFFS, use -s flag)
-  if (onProgress) {
-    onProgress({ type: 'info', data: '3/3 Uploading ESP32 partitions...\n' })
-  }
-
-  const partitionsResult = await uploadFirmware({
-    espIp: options.espIp,
-    firmwareFile: 'ScribitESP.ino.partitions.bin',
-    espPort: 3232,
-    spiffs: true,  // -s flag
-    hostIp: options.hostIp,
-    password: options.password
-  }, onProgress)
-  results.push({ file: 'ScribitESP.ino.partitions.bin', ...partitionsResult })
-
-  if (!partitionsResult.success) {
-    return {
-      success: false,
-      results,
-      error: 'ESP32 partitions upload failed'
-    }
-  }
+  // NOTE: A 3rd step used to live here that uploaded ScribitESP.ino.partitions.bin
+  // with the SPIFFS flag (-s). That was a bug: espota's -s expects a SPIFFS
+  // *filesystem image*, so it wrote the 3 KB partition table into the 5.5 MB SPIFFS
+  // partition, leaving it unmountable. The firmware then auto-formatted SPIFFS empty
+  // (SPIFFS.begin(true)), which is exactly why the web UI read back as 0 bytes.
+  // The web UI is now embedded directly in the ESP32 firmware
+  // (Firmware/ScribitESP/web_ui.h + tools/gen_web_ui.py), so no SPIFFS/partition
+  // upload is needed. Step removed intentionally.
 
   return {
     success: true,

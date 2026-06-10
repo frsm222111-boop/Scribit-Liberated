@@ -438,27 +438,17 @@ async function uploadSAMD21() {
 }
 
 async function uploadPartitions() {
+  // The web UI is now embedded directly in the ESP32 firmware (web_ui.h), so there
+  // is no SPIFFS/partition image to upload. The previous code uploaded
+  // ScribitESP.ino.partitions.bin with the SPIFFS flag (-s), which wrote the 3 KB
+  // partition table into the SPIFFS partition, leaving it unmountable -> firmware
+  // auto-formatted SPIFFS empty -> web UI read back as 0 bytes. This step now just
+  // finalizes setup; no destructive upload is performed.
   uploading.value = true
-  progress.value = 0
-  status.value = ''
-
-  console.log('Starting partitions upload')
-  const result = await window.electronAPI.uploadSingleFirmware({
-    espIp: '192.168.240.1',
-    firmwareFile: 'ScribitESP.ino.partitions.bin',
-    spiffs: true
-  })
-  console.log('Upload result:', result)
-
-  if (result.success) {
-    progress.value = 100
-    status.value = 'All firmware uploaded! Redirecting to home...'
-    markSetupComplete()
-    setTimeout(() => router.push('/'), 2000)
-  } else {
-    console.error('Upload failed:', result.error)
-    status.value = 'Error: ' + result.error
-  }
+  progress.value = 100
+  status.value = 'Firmware uploaded! Web UI is built into the firmware. Redirecting to home...'
+  markSetupComplete()
+  setTimeout(() => router.push('/'), 2000)
   uploading.value = false
 }
 
