@@ -2,7 +2,82 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [1.7.0] - 2026-06-16
+
+### Added
+- **Reliable drawing over Wi-Fi (idempotent streaming).** Drawings are streamed to the robot
+  one g-code line at a time; previously a *single* dropped or slow request aborted the whole job,
+  so a drawing would die partway through. Each line is now tagged with a sequence number and
+  **retried** on a hiccup, and the firmware **dedupes** resent lines — so a retried *relative*
+  move is never drawn twice. A flaky hotspot no longer kills a drawing. (firmware + `app.js`)
+- **Calibration Test panel (Setup → Test).** Five built-in test designs — **vertical lines,
+  horizontal lines, square + diagonals, circle, and crosshair** — that you can draw with **all
+  four pens** at once or a **single pen**, with a live preview in your real marker colours. Great
+  for checking squareness/roundness/centering and that every pen presses. (`index.html`, `app.js`)
+- **Pause / Resume mid-draw.** Pause stops feeding so the robot holds in place — swap a dried
+  marker or make an adjustment — then Resume right where you left off, no restart. (`app.js`)
+- **Persistent draw action bar.** Whenever the robot is drawing, a floating bar shows live
+  progress and keeps **Pause** and **Stop** one tap away from any tab. (`index.html`, `app.js`, `style.css`)
+- **Live wall-preview.** A mini-canvas fills in the drawing on-screen as the robot plots it
+  (faint full path, bright completed portion, leading dot, live %). (`index.html`, `app.js`, `style.css`)
+- **Screen wake-lock while drawing.** Holds a wake-lock for the duration of a draw so a phone or
+  laptop screen sleeping mid-job can't stall the line feed. (`app.js`)
+
+- **Manual move: a jog D-pad in the Calibrate tab.** Up / down / left / right buttons with a
+  step picker (1″ / 6″ / 12″ / 24″) nudge the robot with the pen up, using true two-string
+  kinematics (convert tracked position → x/y, step, convert back) so directions are genuinely
+  cardinal — not the diagonal-coupled raw-string jog. Includes a live position readout and
+  anchor-line / past-anchor safety limits; the tracked `MACHINE_POS` updates after each move.
+  (`index.html`, `app.js`, `style.css`)
+- **Place-on-wall: drag and resize your drawing.** The Upload tab now shows a wall mini-map —
+  your wall to scale, the robot's position, your set canvas box, and a box sized to your drawing's
+  real dimensions. **Drag** it anywhere (clamped to the reachable/canvas area) and **resize** it
+  with a Size slider (live cm readout), instead of always drawing 1:1 centered on the robot.
+  Implemented via new `offsetX`/`offsetY`/`scale` options in the g-code generator.
+  (`index.html`, `app.js`, `style.css`)
+
+### Changed
+- **Reorganised the whole control panel.** The 12 flat tabs are now **4 areas** — Home, Create,
+  Setup, Our Story — with a contextual sub-switcher (the seven art tools live under *Create*; the
+  setup panels under *Setup*). Plus a cohesive facelift: unified spacing, cleaner section headers,
+  a brighter hero, and smoother micro-interactions — all keeping the blueprint look. (`index.html`, `app.js`, `style.css`)
+- **Removed the old single-pen "Draw Test Pattern"** from Controls — superseded by the new
+  Setup → Test panel (5 designs, single-pen or all-4). (`index.html`, `app.js`)
+- **Robot illustrations now match the real carousel.** The pen-slot dots in every robot graphic
+  (header hero, Home hero, and the setup-wizard Welcome / Mount / Pen / Draw illustrations) were
+  rearranged from a symmetric top/right/bottom/left diamond to the **real layout**: four pens
+  clustered with the empty 5th socket as a **gap on the right**. The Home hero and wizard robot
+  bodies were also changed from rounded rectangles to **circles** to match the physical robot.
+  (`index.html`, `app.js`)
+
+### Fixed
+- **Drawings dying partway through — fixed.** A single dropped/slow stream request used to abort
+  the whole job. Lines are now retried idempotently (see *Reliable drawing over Wi-Fi*), so a
+  brief Wi-Fi hiccup pauses and resumes instead of killing the drawing.
+- **Pens stopping mid-draw (robot moves but nothing marks) — fixed.** The motion controller was
+  configured to auto-disable the **Z stepper** after 120 s of inactivity (`M84` inactivity
+  timeout). On Scribit, Z is the **pen carousel/cam**, so disabling it **un-seats the pen** — after
+  that, every pen-down just rotates the carousel instead of pressing. Each drawing now sends
+  **`M84 S0`** at startup to disable that timeout, keeping the pen-cam energized and seated through
+  any stream pauses. (firmware + `app.js`)
+- **"Center robot on wall" now works after the robot has drifted.** It computed its move from the
+  *calibrated home* instead of the robot's *tracked actual position*, so a robot that had drifted
+  (e.g. after a stopped/interrupted draw) got a wrong delta — and when home ≈ centre, the move came
+  out ~0, so the robot only homed the carousel and never travelled. It now moves from the tracked
+  `MACHINE_POS`. (`app.js`)
+- **Multi-colour SVG layouts no longer collapse onto one point.** `scribit_svg_to_gcode.py`
+  centred *each path on its own bounding box*, so every colour group stacked on the same spot
+  instead of keeping its position in the drawing. It now centres on the **global** bounding box
+  across all paths, so multi-pen artwork lands laid out as designed. (Single-path drawings are
+  unaffected.)
+
+### Notes
+- `scribit_svg_to_gcode.py --stats` is a **dry run** — it prints statistics and does *not* write
+  the output file. Omit `--stats` to actually generate g-code.
+- Pen switching is **forward-only** and assumes paths are encountered in **ascending slot order**
+  (slot1→2→3→4). The default greedy path optimiser reorders by proximity and can break pen
+  selection on multi-colour jobs — use `--no-optimize` and author paths in slot order. (Robust
+  fix for the optimiser is still open.)
 
 ## [1.6.0] - 2026-06-09
 

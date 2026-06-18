@@ -155,6 +155,23 @@ async function apiPost(path, body, isText) {
   return isText ? r.text() : r.json();
 }
 
+// POST that keeps retrying on transient errors — for stream control messages
+// (/stream/start, /stream/end, /stop). A lost /stream/end was what previously
+// left the robot stuck "PRINTING" forever after a hiccup. A 409 means the device
+// is already in the target state, which is fine for our purposes.
+async function apiPostResilient(path, body) {
+  var last;
+  for (var k = 0; k < 30; k++) {
+    try { return await apiPost(path, body, true); }
+    catch (e) {
+      last = e;
+      if (('' + e.message).indexOf('409') >= 0) return null;
+      await sleep(200);
+    }
+  }
+  throw last || new Error('request failed: ' + path);
+}
+
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
 // ---- Stream mode -----------------------------------------------------------
@@ -163,7 +180,19 @@ function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 // and stalls on anything but the smallest files). The firmware keeps the device
 // in PRINTING for the duration and replies {"status":"full"} when its line buffer
 // is full, so we apply backpressure (retry) and never overflow it.
-var streamActive = false, streamCancel = false;
+var streamActive = false, streamCancel = false, streamPaused = false, streamPct = 0;
+
+// Screen wake-lock: a phone/laptop screen sleeping mid-draw stalls the line feed.
+// Hold a wake-lock for the duration of a drawing so the controlling device stays awake.
+var _wakeLock = null;
+async function acquireWakeLock() {
+  try { if ('wakeLock' in navigator) _wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+function releaseWakeLock() { try { if (_wakeLock) { _wakeLock.release(); _wakeLock = null; } } catch (e) {} }
+// Re-acquire if the tab was hidden and comes back while still drawing (locks drop on hide).
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && streamActive && !_wakeLock) acquireWakeLock();
+});
 
 function gcodeLines(gcode) {
   return gcode.split('\n')
@@ -198,6 +227,31 @@ function gcodeLeavesCanvas(lines) {
   return null;
 }
 
+// Reconstruct the Cartesian path from the (string-delta) g-code so the live preview
+// can fill it in as we plot. Same string-length simulation as the canvas/anchor guard.
+// Returns null if uncalibrated (we just skip the preview then).
+function previewFromLines(lines) {
+  var A = calibMM.anchor, L = calibMM.left, R = calibMM.right;
+  if (!A || !L || !R) return null;
+  var p0 = calcPosition(A, L, R);
+  var pts = [[p0.x, p0.y]];
+  var minX = p0.x, maxX = p0.x, minY = p0.y, maxY = p0.y;
+  for (var i = 0; i < lines.length; i++) {
+    var m = lines[i];
+    if (m.charAt(0) !== 'G') continue;
+    var xm = m.match(/X(-?\d+(?:\.\d+)?)/), ym = m.match(/Y(-?\d+(?:\.\d+)?)/);
+    if (!xm && !ym) continue;
+    if (xm) L += parseFloat(xm[1]);
+    if (ym) R += -parseFloat(ym[1]);
+    var p = calcPosition(A, L, R);
+    pts.push([p.x, p.y]);
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  if (pts.length < 2) return null;
+  return { pts: pts, minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+}
+
 // Returns quickly after kicking off the background feed, so the caller's
 // "sent — drawing" toast fires right away. The robot draws as we feed it.
 // opts.bounds === false skips the canvas/anchor guard (for intentional reposition
@@ -211,6 +265,7 @@ async function streamDrawing(gcode, opts) {
     var be = gcodeLeavesCanvas(lines);
     if (be) throw new Error('Refused — ' + be + '. Use "Fit to wall" or recenter the robot.');
   }
+  try { window._drawPreview = previewFromLines(lines); } catch (e) { window._drawPreview = null; }
   _runStream(lines);
   return { status: 'streaming', lines: lines.length };
 }
@@ -218,43 +273,71 @@ async function streamDrawing(gcode, opts) {
 async function _runStream(lines) {
   streamActive = true;
   streamCancel = false;
+  streamPaused = false;
+  streamPct = 0;
+  acquireWakeLock();
   var ok = false;
   var sumX = 0, sumY = 0;   // net string-deltas actually sent → tracked machine position
   try {
-    await apiPost('/stream/start', '', true);
+    await apiPostResilient('/stream/start', '');
     for (var i = 0; i < lines.length; i++) {
       if (streamCancel) break;
-      var tries = 0;
+      // Pause = stop feeding. The robot drains its small buffer and holds in place
+      // (the RAM stream stays open), so the user can fix a pen, then Resume.
+      while (streamPaused && !streamCancel) { await sleep(200); }
+      if (streamCancel) break;
+      var seq = i + 1;                 // 1-based; firmware dedupes resent seqs
+      var tries = 0;                   // buffer-full backoff count
+      var netFails = 0;                // consecutive transient request failures
       while (true) {
-        var resp = await apiPost('/gcode', lines[i], true);
-        var full = false;
-        try { full = (JSON.parse(resp).status === 'full'); } catch (e) {}
-        if (!full) break;                 // accepted
         if (streamCancel) break;
+        var resp;
+        try {
+          resp = await apiPost('/gcode?n=' + seq, lines[i], true);
+        } catch (e) {
+          // Transient hiccup/timeout. The firmware dedupes by seq, so re-sending
+          // the SAME line is safe (exactly-once) — keep trying instead of killing
+          // the whole drawing on one bad request (the old partial-draw failure).
+          if (streamCancel) break;
+          if (++netFails > 240) throw new Error('lost connection to robot at line ' + i + ' of ' + lines.length);
+          await sleep(Math.min(1000, 150 * netFails));   // backoff, cap 1s
+          continue;
+        }
+        var st = '';
+        try { st = JSON.parse(resp).status; } catch (e) {}
+        if (st !== 'full') break;         // 'queued' (incl. dedup) → accepted
         await sleep(50);                  // buffer full → back off and retry
-        if (++tries > 4000) throw new Error('robot stopped accepting g-code');
+        if (++tries > 8000) throw new Error('robot stopped accepting g-code');
       }
+      if (streamCancel) break;
       var mx = lines[i].match(/X(-?\d+(?:\.\d+)?)/), my = lines[i].match(/Y(-?\d+(?:\.\d+)?)/);
       if (mx) sumX += parseFloat(mx[1]);
       if (my) sumY += parseFloat(my[1]);
-      if (i % 20 === 0) showToast('Drawing… ' + Math.round(100 * i / lines.length) + '%', '');
+      streamPct = Math.round(100 * i / lines.length);
+      if (i % 20 === 0) showToast('Drawing… ' + streamPct + '%', '');
     }
     ok = !streamCancel;
   } catch (e) {
     showToast('Stream error: ' + e.message, 'error');
   } finally {
     try {
-      if (ok) await apiPost('/stream/end', '', true);   // finish cleanly
-      else await apiPost('/stop', '', true);            // cancelled/errored → halt
+      if (ok) await apiPostResilient('/stream/end', '');   // finish cleanly
+      else await apiPostResilient('/stop', '');            // cancelled/errored → halt
     } catch (e) {}
     advanceMachinePos(sumX, sumY);   // keep the tracked position in sync with what was sent
     streamActive = false;
+    releaseWakeLock();
     if (ok) showToast('All lines sent — robot finishing…', 'success');
   }
 }
 
 var drawStartT = 0, wasDrawing = false;
 async function pollStatus() {
+  // While a drawing is streaming, don't poll /status — the robot's HTTP server is
+  // single-threaded, and a concurrent status GET steals time from the line-by-line
+  // /gcode feed (a big part of what saturated it and stalled draws). The stream
+  // shows its own "Drawing… %" progress instead.
+  if (streamActive) return true;
   try {
     var s = await apiGet('/status');
     deviceState = s.state || 'IDLE';
@@ -704,6 +787,9 @@ function svgToGcode(svgText, anchorDist, leftLen, rightLen, opts) {
   if (!paths.length) return '';
   opts = opts || {};
   var yOffset = opts.yOffset || 0;   // erase mode shifts the pen path up so the eraser (77mm below) tracks the line
+  var offX = opts.offsetX || 0;      // place-on-wall: shift the whole drawing off robot-centre (mm)
+  var offY = opts.offsetY || 0;
+  var dscale = opts.scale || 1;      // place-on-wall: resize the drawing about its own centre
   var pdir = opts.penDir || 1;       // pen-carousel rotation direction (configurable for the wrong-way bug)
   var pd = SETTINGS.penDepth, seg = opts.segment || SETTINGS.segment;   // pen depth + max segment (opts.segment lets fills use coarser segments to shrink g-code)
 
@@ -714,6 +800,7 @@ function svgToGcode(svgText, anchorDist, leftLen, rightLen, opts) {
     '; Scribit Liberated — self-contained: home pen 1, then draw',
     '; Anchor: ' + anchorDist + 'mm, Left: ' + leftLen + 'mm, Right: ' + rightLen + 'mm',
     'M17 ; enable steppers',
+    'M84 S0 ; disable stepper inactivity timeout — keeps the pen-cam (Z) energized so it stays seated through stream pauses (otherwise the carousel un-seats after 120s idle and pens stop pressing)',
     'G77 ; home pen carousel',
     'G90 ; absolute',
     'G1 Z160 ; overshoot to seat pen 1',
@@ -811,8 +898,8 @@ function svgToGcode(svgText, anchorDist, leftLen, rightLen, opts) {
       if (penDown) { if (penZRel !== -pd) { goZ(0); goZ(-pd); } }
       else { if (penZRel !== penClear) { goZ(0); goZ(penClear); } }
 
-      var targetX = startX + (svgX - svgCenterX);
-      var targetY = startY + (svgY - svgCenterY) + yOffset;
+      var targetX = startX + (svgX - svgCenterX) * dscale + offX;
+      var targetY = startY + (svgY - svgCenterY) * dscale + yOffset + offY;
 
       // Subdivide pen-down moves in Cartesian space so straight lines stay
       // straight: the firmware interpolates string lengths linearly, so a
@@ -848,6 +935,8 @@ function svgToGcode(svgText, anchorDist, leftLen, rightLen, opts) {
 var uploadSvgText = null;   // last-loaded SVG, kept so we can re-convert on assignment/pen changes
 var uploadColorMap = {};    // color string -> slot (1-4)
 var uploadPathOverride = {};// path index -> slot (1-4): per-shape override from clicking the preview
+var uploadOffset = { x: 0, y: 0 };  // place-on-wall offset (mm) from robot-centred default
+var uploadScale = 1;                // place-on-wall resize factor (1 = drawing's native mm size)
 
 function elementStrokeColor(el) {
   var style = el.getAttribute('style') || '';
@@ -869,7 +958,114 @@ function detectUploadColors() {
 function rebuildUploadGcode() {
   if (!uploadSvgText) return;
   uploadedGcode = svgToGcode(uploadSvgText, calibMM.anchor, calibMM.left, calibMM.right,
-    { yOffset: eraseToggle.checked ? ERASE_Y_OFFSET : 0, penDir: penDir(), colorMap: uploadColorMap, penOverride: uploadPathOverride });
+    { yOffset: eraseToggle.checked ? ERASE_Y_OFFSET : 0, penDir: penDir(), colorMap: uploadColorMap,
+      penOverride: uploadPathOverride, offsetX: uploadOffset.x, offsetY: uploadOffset.y, scale: uploadScale });
+}
+
+// Real-world size + centre of the loaded drawing, in mm (UI uses 1 svg-unit = 1 mm).
+function uploadDrawingSizeMM() {
+  if (!uploadSvgText) return null;
+  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  parseSVGPaths(uploadSvgText).forEach(function (p) {
+    parsePathToPoints(p.d, 5).forEach(function (pt) {
+      if (pt[0] < minX) minX = pt[0]; if (pt[0] > maxX) maxX = pt[0];
+      if (pt[1] < minY) minY = pt[1]; if (pt[1] > maxY) maxY = pt[1];
+    });
+  });
+  if (minX === Infinity) return null;
+  return { w: maxX - minX, h: maxY - minY };
+}
+
+// ===== Place-on-wall: drag the drawing to a spot on the wall =====
+var PW = { map: null, A: 0, mapH: 0, robot: null, draw: null, box: null, grab: null };
+
+function pwClampCenter(cx, cy) {
+  var hx = PW.draw.w * uploadScale / 2, hy = PW.draw.h * uploadScale / 2;
+  var minX = hx, maxX = PW.A - hx, minY = hy, maxY = PW.mapH - hy;
+  if (calibMM.canvasW > 0) { minX = Math.max(minX, PW.robot.x - calibMM.canvasW / 2 + hx); maxX = Math.min(maxX, PW.robot.x + calibMM.canvasW / 2 - hx); }
+  if (calibMM.canvasH > 0) { minY = Math.max(minY, PW.robot.y - calibMM.canvasH / 2 + hy); maxY = Math.min(maxY, PW.robot.y + calibMM.canvasH / 2 - hy); }
+  if (maxX < minX) minX = maxX = PW.A / 2;
+  if (maxY < minY) minY = maxY = PW.mapH / 2;
+  return [Math.min(maxX, Math.max(minX, cx)), Math.min(maxY, Math.max(minY, cy))];
+}
+function pwPlace() {
+  if (!PW.box) return;
+  var ew = PW.draw.w * uploadScale, eh = PW.draw.h * uploadScale;
+  var cx = PW.robot.x + uploadOffset.x, cy = PW.robot.y + uploadOffset.y;
+  PW.box.setAttribute('width', ew); PW.box.setAttribute('height', eh);
+  PW.box.setAttribute('x', cx - ew / 2);
+  PW.box.setAttribute('y', cy - eh / 2);
+  var ro = document.getElementById('pw-readout');
+  if (ro) ro.textContent = 'Center x ' + Math.round(cx) + ', y ' + Math.round(cy) + ' mm  ·  size ' + (ew / 10).toFixed(0) + '×' + (eh / 10).toFixed(0) + ' cm';
+  var sv = document.getElementById('pw-scale-val');
+  if (sv) sv.textContent = uploadScale.toFixed(2) + '×';
+}
+function pwPointMM(e) {
+  var r = PW.map.getBoundingClientRect();
+  var px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+  var py = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+  return [px / r.width * PW.A, py / r.height * PW.mapH];
+}
+function pwDown(e) { if (!PW.box) return; e.preventDefault(); var p = pwPointMM(e); PW.grab = [p[0] - (PW.robot.x + uploadOffset.x), p[1] - (PW.robot.y + uploadOffset.y)]; PW.box.style.cursor = 'grabbing'; }
+function pwMove(e) { if (!PW.grab) return; e.preventDefault(); var p = pwPointMM(e); var c = pwClampCenter(p[0] - PW.grab[0], p[1] - PW.grab[1]); uploadOffset.x = c[0] - PW.robot.x; uploadOffset.y = c[1] - PW.robot.y; pwPlace(); }
+function pwUp() { if (!PW.grab) return; PW.grab = null; if (PW.box) PW.box.style.cursor = 'grab'; rebuildUploadGcode(); }
+document.addEventListener('mousemove', pwMove); document.addEventListener('touchmove', pwMove, { passive: false });
+document.addEventListener('mouseup', pwUp);     document.addEventListener('touchend', pwUp);
+
+function renderPlaceMap() {
+  var panel = document.getElementById('place-on-wall'), map = document.getElementById('pw-map');
+  if (!panel || !map) return;
+  var A = calibMM.anchor, L = calibMM.left, R = calibMM.right, draw = uploadDrawingSizeMM();
+  if (!uploadSvgText || !A || !L || !R || !draw) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  var robot = calcPosition(A, L, R);
+  // cap scale so the drawing can't exceed ~95% of the wall width; size the map for that worst case
+  var maxScale = Math.max(1.2, Math.min(4, (A * 0.95) / draw.w));
+  if (uploadScale > maxScale) uploadScale = maxScale;
+  var mapH = Math.max(robot.y + draw.h * maxScale / 2 + 300, 1600);
+  PW.map = map; PW.A = A; PW.mapH = mapH; PW.robot = robot; PW.draw = draw;
+
+  var c = pwClampCenter(robot.x + uploadOffset.x, robot.y + uploadOffset.y);
+  uploadOffset.x = c[0] - robot.x; uploadOffset.y = c[1] - robot.y;
+
+  map.setAttribute('viewBox', '0 0 ' + A + ' ' + mapH);
+  var sw = A / 360;
+  var canvasRect = (calibMM.canvasW > 0 && calibMM.canvasH > 0)
+    ? '<rect x="' + (robot.x - calibMM.canvasW / 2) + '" y="' + (robot.y - calibMM.canvasH / 2) + '" width="' + calibMM.canvasW + '" height="' + calibMM.canvasH + '" fill="rgba(47,175,90,0.05)" stroke="#2faf5a" stroke-width="' + (sw * 1.4) + '" stroke-dasharray="' + (sw * 6) + ' ' + (sw * 5) + '"/>'
+    : '';
+  map.innerHTML =
+    '<rect x="0" y="0" width="' + A + '" height="' + mapH + '" fill="rgba(255,255,255,0.02)" stroke="#46566b" stroke-width="' + sw + '"/>' +
+    canvasRect +
+    '<line x1="0" y1="0" x2="' + robot.x + '" y2="' + robot.y + '" stroke="#6f8fb0" stroke-width="' + sw + '"/>' +
+    '<line x1="' + A + '" y1="0" x2="' + robot.x + '" y2="' + robot.y + '" stroke="#6f8fb0" stroke-width="' + sw + '"/>' +
+    '<circle cx="0" cy="0" r="' + (sw * 6) + '" fill="#cfe0f0"/>' +
+    '<circle cx="' + A + '" cy="0" r="' + (sw * 6) + '" fill="#cfe0f0"/>' +
+    '<circle cx="' + robot.x + '" cy="' + robot.y + '" r="' + (sw * 7) + '" fill="#46c6f5"/>';
+
+  var box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  box.setAttribute('width', draw.w); box.setAttribute('height', draw.h); box.setAttribute('rx', sw * 3);
+  box.setAttribute('fill', 'rgba(70,198,245,0.18)'); box.setAttribute('stroke', '#46c6f5'); box.setAttribute('stroke-width', sw * 2);
+  box.style.cursor = 'grab';
+  box.addEventListener('mousedown', pwDown); box.addEventListener('touchstart', pwDown, { passive: false });
+  map.appendChild(box);
+  PW.box = box;
+  pwPlace();
+
+  var centerBtn = document.getElementById('pw-center');
+  if (centerBtn) centerBtn.onclick = function () { uploadOffset.x = 0; uploadOffset.y = 0; var cc = pwClampCenter(robot.x, robot.y); uploadOffset.x = cc[0] - robot.x; uploadOffset.y = cc[1] - robot.y; pwPlace(); rebuildUploadGcode(); };
+
+  var slider = document.getElementById('pw-scale');
+  if (slider) {
+    slider.min = '0.25'; slider.max = maxScale.toFixed(2); slider.step = '0.05'; slider.value = uploadScale;
+    slider.oninput = function () {
+      uploadScale = parseFloat(slider.value);
+      var cc = pwClampCenter(robot.x + uploadOffset.x, robot.y + uploadOffset.y);   // keep centred spot, re-clamp for new size
+      uploadOffset.x = cc[0] - robot.x; uploadOffset.y = cc[1] - robot.y;
+      pwPlace();
+    };
+    slider.onchange = function () { rebuildUploadGcode(); };
+  }
+  pwPlace();
 }
 
 // Pen a path resolves to: per-shape override (click) > color map > nearest-color default.
@@ -990,6 +1186,7 @@ function buildColorAssignUI() {
   var colors = detectUploadColors();
   if (!colors.length) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
+  var caw = document.getElementById('ca-wall'); if (caw) caw.value = SETTINGS.wallColor || '#f2e9d0';   // reflect current wall colour
   var fresh = {};
   colors.forEach(function (c) { fresh[c] = uploadColorMap[c] || colorToPen(c); });
   uploadColorMap = fresh;
@@ -1036,8 +1233,11 @@ async function handleFileUpload(file) {
   if (isSVG(file)) {
     uploadSvgText = await file.text();
     uploadPathOverride = {};   // fresh file → clear any per-shape pen overrides
+    uploadOffset = { x: 0, y: 0 };  // new drawing starts centred on the robot
+    uploadScale = 1;                // …at native size
     buildColorAssignUI();
     rebuildUploadGcode();
+    renderPlaceMap();
     var cmdCount = (uploadedGcode.match(/G1 /g) || []).length;
     showToast((eraseToggle.checked ? 'Erase path' : 'SVG') + ' ready: ' + cmdCount + ' moves', 'success');
     return;
@@ -1046,6 +1246,7 @@ async function handleFileUpload(file) {
   // Raw .gcode file: used as-is. Erase mode can't be applied to pre-baked string-delta G-code.
   uploadSvgText = null;
   var panel = document.getElementById('color-assign'); if (panel) panel.classList.add('hidden');
+  var pw = document.getElementById('place-on-wall'); if (pw) pw.classList.add('hidden');
   var gcode = await file.text();
   if (eraseToggle.checked) {
     showToast('Erase mode applies to SVG & generative art, not raw G-code', 'error');
@@ -1055,6 +1256,19 @@ async function handleFileUpload(file) {
 }
 
 document.addEventListener('pens-changed', function () { if (uploadSvgText) { buildColorAssignUI(); rebuildUploadGcode(); } });
+
+// Wall-colour picker mirrored into the Upload tab's Pen assignment section (same
+// setting as Settings → Preview wall color; tints the --wall preview background).
+(function caWallPicker() {
+  var caw = document.getElementById('ca-wall');
+  if (!caw) return;
+  caw.value = SETTINGS.wallColor || '#f2e9d0';
+  caw.addEventListener('input', function () {
+    SETTINGS.wallColor = caw.value; applyWallColor();
+    var sw = document.getElementById('set-wall'); if (sw) sw.value = caw.value;   // keep Settings picker in sync
+  });
+  caw.addEventListener('change', saveSettings);
+})();
 if (typeof eraseToggle !== 'undefined' && eraseToggle) {
   eraseToggle.addEventListener('change', function () { if (uploadSvgText) rebuildUploadGcode(); });
 }
@@ -1099,18 +1313,8 @@ function testPatternSVG() {
   s += '<path d="M50 60 L70 60" stroke="' + col + '" fill="none"/><path d="M60 50 L60 70" stroke="' + col + '" fill="none"/>';
   return s + '</svg>';
 }
-var btnTest = document.getElementById('btn-testpattern');
-if (btnTest) btnTest.addEventListener('click', async function () {
-  if (!confirm('Draw a 120 mm calibration test pattern at the current pen?')) return;
-  btnTest.disabled = true;
-  try {
-    var cmap = {}; cmap[penColor(1)] = 1;
-    var g = svgToGcode(testPatternSVG(), calibMM.anchor, calibMM.left, calibMM.right, { penDir: penDir(), colorMap: cmap });
-    await streamDrawing(g);
-    showToast('Test pattern sent — drawing!', 'success');
-  } catch (e) { showToast('Failed: ' + e.message, 'error'); }
-  finally { btnTest.disabled = false; }
-});
+// (Old single-pen "Draw Test Pattern" removed — superseded by Setup → Test,
+//  which offers 5 designs and per-pen / all-4 selection.)
 
 // Device controls
 btnHome.addEventListener('click', async function() {
@@ -1128,6 +1332,9 @@ btnHome.addEventListener('click', async function() {
 });
 
 btnPause.addEventListener('click', async function() {
+  // During a browser stream, pause = stop feeding lines (most reliable). Otherwise
+  // fall back to the firmware pause for file/MQTT jobs.
+  if (streamActive) { streamPaused = true; if (window._refreshActionBar) window._refreshActionBar(); showToast('Paused — fix your pen, then Resume', ''); return; }
   btnPause.disabled = true;
   try {
     await apiPost('/pause', {});
@@ -1140,6 +1347,7 @@ btnPause.addEventListener('click', async function() {
 });
 
 btnResume.addEventListener('click', async function() {
+  if (streamActive) { streamPaused = false; if (window._refreshActionBar) window._refreshActionBar(); showToast('Resumed', 'success'); return; }
   btnResume.disabled = true;
   try {
     await apiPost('/resume', {});
@@ -1325,6 +1533,7 @@ function calibRecompute() {
     return null;
   }
   calibMM = { anchor: r.anchor, left: r.L, right: r.R, canvasW: r.canvasW, canvasH: r.canvasH };   // canonical mm for the converter
+  if (uploadSvgText) { renderPlaceMap(); rebuildUploadGcode(); }   // keep the place-on-wall map in sync with new calibration
   var f = calibFactor(), u = calibUnit, dp = (u === 'in') ? 2 : 1, dp0 = (u === 'in') ? 1 : 0;
   calibLeft.value = (r.L / f).toFixed(dp);
   calibRight.value = (r.R / f).toFixed(dp);
@@ -1359,7 +1568,12 @@ if (btnCenter) btnCenter.addEventListener('click', async function () {
   var cx = A / 2, cy = p.y;
   var tL = Math.sqrt(cx * cx + cy * cy), tR = Math.sqrt((A - cx) * (A - cx) + cy * cy);
   if (!confirm('Move the robot to the center of the wall and use that as home?')) return;
-  var dL = tL - calibMM.left, dR = tR - calibMM.right;
+  // Move from where the robot ACTUALLY is now (tracked machine position), NOT from
+  // the calibrated home. If the robot has drifted (e.g. a stopped/interrupted draw),
+  // computing the delta from home produces a wrong move — and when home ≈ centre it
+  // comes out ~0, so the robot only homes the carousel and never travels.
+  var cur = (MACHINE_POS && isFinite(MACHINE_POS.L) && isFinite(MACHINE_POS.R)) ? MACHINE_POS : { L: calibMM.left, R: calibMM.right };
+  var dL = tL - cur.L, dR = tR - cur.R;
   var g = 'M17\nG77\nG90\nG1 Z160\nG91\nG1 Z-70\nG1 F1500\nG1 X' + dL.toFixed(3) + ' Y' + (-dR).toFixed(3) + '\nM18\n';
   btnCenter.disabled = true;
   try {
@@ -1376,6 +1590,69 @@ if (btnCenter) btnCenter.addEventListener('click', async function () {
   } catch (e) { showToast('Center failed: ' + e.message, 'error'); }
   finally { btnCenter.disabled = false; }
 });
+
+// ---- Manual move / jog D-pad -----------------------------------------------------------------
+// True cardinal jog: convert the tracked position to (x,y), step it in mm, convert back to string
+// lengths, and stream the relative move with the pen UP. _runStream() auto-advances MACHINE_POS.
+var JOG = { stepMM: 152.4, feed: 1500 };   // default 6", F1500
+var jogStepsBar = document.getElementById('jog-steps');
+var jogPosEl = document.getElementById('jog-pos');
+
+function jogCurrent() {   // best-known current string lengths (tracked, else calibrated home)
+  if (MACHINE_POS && isFinite(MACHINE_POS.L) && isFinite(MACHINE_POS.R)) return { L: MACHINE_POS.L, R: MACHINE_POS.R, tracked: true };
+  if (calibMM && calibMM.left && calibMM.right) return { L: calibMM.left, R: calibMM.right, tracked: false };
+  return null;
+}
+function updateJogPos() {
+  if (!jogPosEl) return;
+  var cur = jogCurrent();
+  if (!cur || !calibMM || !calibMM.anchor) { jogPosEl.textContent = 'position unknown'; return; }
+  var p = calcPosition(calibMM.anchor, cur.L, cur.R);
+  var f = calibFactor(), u = calibUnit, dp = (u === 'in') ? 1 : 0;
+  jogPosEl.textContent = (cur.tracked ? '' : '~') + 'x ' + (p.x / f).toFixed(dp) + ' · drop ' + (p.y / f).toFixed(dp) + ' ' + u;
+}
+
+async function jogMove(dirX, dirY) {   // dirX:+right, dirY:+down (toward floor)
+  if (streamActive) { showToast('Busy — wait for the current move', 'error'); return; }
+  if (!calibMM || !calibMM.anchor) { showToast('Calibrate your wall first', 'error'); return; }
+  var cur = jogCurrent();
+  if (!cur) { showToast('No position yet — calibrate or center first', 'error'); return; }
+  var A = calibMM.anchor, p = calcPosition(A, cur.L, cur.R);
+  var nx = p.x + dirX * JOG.stepMM, ny = p.y + dirY * JOG.stepMM;
+  var bad = [];
+  if (ny < 40) bad.push('too near the anchor line');
+  if (nx < 15) bad.push('past the left anchor');
+  if (nx > A - 15) bad.push('past the right anchor');
+  if (bad.length) { showToast("Can't move there: " + bad.join(', '), 'error'); return; }
+  var sl = calcStringLengths(A, nx, ny);
+  var dL = sl[0] - cur.L, dR = sl[1] - cur.R;
+  var g = 'M17\nG91\nG1 F' + JOG.feed + '\nG1 X' + dL.toFixed(3) + ' Y' + (-dR).toFixed(3) + '\nM18\n';
+  jogSetEnabled(false);
+  try {
+    await streamDrawing(g, { bounds: false });   // MACHINE_POS auto-updates on stream completion
+    var dirName = dirX < 0 ? 'left' : dirX > 0 ? 'right' : dirY < 0 ? 'up' : 'down';
+    showToast('Jogging ' + dirName + ' ' + (JOG.stepMM / 25.4).toFixed(JOG.stepMM % 25.4 ? 1 : 0) + '″…', '');
+  } catch (e) { showToast('Jog failed: ' + e.message, 'error'); }
+  finally {
+    // re-enable + refresh the readout once the (async) stream finishes and the tracker advances
+    var waitDone = setInterval(function () { if (!streamActive) { clearInterval(waitDone); jogSetEnabled(true); updateJogPos(); } }, 250);
+    setTimeout(function () { clearInterval(waitDone); jogSetEnabled(true); updateJogPos(); }, 60000);
+  }
+}
+function jogSetEnabled(on) {
+  ['jog-up', 'jog-down', 'jog-left', 'jog-right'].forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = !on; });
+}
+
+if (jogStepsBar) jogStepsBar.addEventListener('click', function (e) {
+  var b = e.target.closest('.seg'); if (!b) return;
+  JOG.stepMM = parseFloat(b.dataset.mm) || 152.4;
+  Array.prototype.forEach.call(jogStepsBar.children, function (c) { c.classList.toggle('active', c === b); });
+});
+[['jog-up', 0, -1], ['jog-down', 0, 1], ['jog-left', -1, 0], ['jog-right', 1, 0]].forEach(function (j) {
+  var b = document.getElementById(j[0]);
+  if (b) b.addEventListener('click', function () { jogMove(j[1], j[2]); });
+});
+updateJogPos();
 
 var calibUnitBar = document.getElementById('calib-unit');
 if (calibUnitBar) calibUnitBar.addEventListener('click', function (e) {
@@ -1916,20 +2193,202 @@ if (penInvert) {
   });
 }
 
-// ===== Tabbed navigation =====
-(function tabs() {
-  var bar = document.getElementById('tabs');
-  if (!bar) return;
+// ===== Two-level navigation =====
+// Four primary areas; each maps to one or more existing section[data-tab] panels.
+// The seven "make art" panels live under Create; setup panels under Setup. The
+// section markup is unchanged — we just group it, so every feature keeps working.
+(function nav() {
+  var GROUPS = {
+    home:   { subs: [['home', 'Home']] },
+    create: { subs: [['gallery', 'Gallery'], ['upload', 'Upload'], ['generative', 'Generate'], ['image', 'Image'], ['text', 'Text'], ['draw', 'Draw'], ['qr', 'QR']] },
+    setup:  { subs: [['calibration', 'Calibrate'], ['caltest', 'Test'], ['controls', 'Controls'], ['settings', 'Settings']] },
+    about:  { subs: [['about', 'Our Story']] }
+  };
+  var topnav = document.getElementById('topnav');
+  var subnav = document.getElementById('subnav');
+  if (!topnav || !subnav) return;
   var sections = document.querySelectorAll('section[data-tab]');
-  function show(name) {
+  var sectionGroup = {};                 // section name -> group key
+  var lastSub = {};                      // group key -> last sub viewed (sticky)
+  Object.keys(GROUPS).forEach(function (g) {
+    lastSub[g] = GROUPS[g].subs[0][0];
+    GROUPS[g].subs.forEach(function (s) { sectionGroup[s[0]] = g; });
+  });
+
+  function renderSub(group, active) {
+    var subs = GROUPS[group].subs;
+    if (subs.length <= 1) { subnav.innerHTML = ''; subnav.classList.add('hidden'); return; }
+    subnav.classList.remove('hidden');
+    subnav.innerHTML = subs.map(function (s) {
+      return '<button class="subbtn' + (s[0] === active ? ' active' : '') + '" data-sub="' + s[0] + '">' + s[1] + '</button>';
+    }).join('');
+  }
+  function showSection(name) {
+    if (!sectionGroup[name]) return;
+    var group = sectionGroup[name];
+    lastSub[group] = name;
     Array.prototype.forEach.call(sections, function (s) { s.classList.toggle('hidden', s.dataset.tab !== name); });
-    Array.prototype.forEach.call(bar.children, function (b) { b.classList.toggle('active', b.dataset.tab === name); });
+    Array.prototype.forEach.call(topnav.querySelectorAll('.navbtn'), function (b) {
+      if (b.dataset.group) b.classList.toggle('active', b.dataset.group === group);
+    });
+    renderSub(group, name);
     window.scrollTo(0, 0);
   }
-  bar.addEventListener('click', function (e) { var b = e.target.closest('.tab'); if (b) show(b.dataset.tab); });
-  // Any element with data-goto (the Home screen cards / buttons) jumps to that tab.
-  document.addEventListener('click', function (e) { var g = e.target.closest('[data-goto]'); if (g) show(g.dataset.goto); });
-  show('home');
+  topnav.addEventListener('click', function (e) {
+    var b = e.target.closest('.navbtn'); if (b && b.dataset.group) showSection(lastSub[b.dataset.group]);
+  });
+  subnav.addEventListener('click', function (e) {
+    var b = e.target.closest('.subbtn'); if (b) showSection(b.dataset.sub);
+  });
+  // Home cards / buttons with data-goto jump straight to a section (even across groups).
+  document.addEventListener('click', function (e) { var g = e.target.closest('[data-goto]'); if (g) showSection(g.dataset.goto); });
+  window._showSection = showSection;     // let other modules navigate
+  showSection('home');
+})();
+
+// ===== Persistent draw action bar (Pause / Stop always reachable) =====
+(function actionBar() {
+  var bar = document.getElementById('draw-actionbar');
+  if (!bar) return;
+  var stEl = document.getElementById('ab-status'), pctEl = document.getElementById('ab-pct'),
+      pauseBtn = document.getElementById('ab-pause'), stopBtn = document.getElementById('ab-stop');
+  function refresh() {
+    var drawing = streamActive || deviceState === 'PRINTING' || deviceState === 'ERASING';
+    bar.classList.toggle('hidden', !drawing);
+    bar.classList.toggle('paused', streamPaused);
+    if (!drawing) return;
+    pauseBtn.style.display = streamActive ? '' : 'none';  // pause only applies to browser streams
+    pauseBtn.textContent = streamPaused ? '▶ Resume' : '⏸ Pause';
+    stEl.textContent = streamPaused ? 'Paused' : (deviceState === 'ERASING' ? 'Erasing…' : 'Drawing…');
+    pctEl.textContent = (streamActive && streamPct > 0) ? streamPct + '%' : '';
+  }
+  pauseBtn.addEventListener('click', function () {
+    if (!streamActive) return;
+    streamPaused = !streamPaused;
+    showToast(streamPaused ? 'Paused — fix your pen, then Resume' : 'Resumed', streamPaused ? '' : 'success');
+    refresh();
+  });
+  stopBtn.addEventListener('click', async function () {
+    if (!confirm('Stop current job?')) return;
+    streamCancel = true; streamPaused = false;
+    try { await apiPost('/stop', '', true); await apiPost('/gcode', 'M410', true); } catch (e) {}
+    showToast('Stopped', 'success'); refresh();
+  });
+  window._refreshActionBar = refresh;
+  setInterval(refresh, 400);
+})();
+
+// ===== Calibration Test (5 designs · one pen or all 4) =====
+// Builds each design as an SVG and runs it through the SAME calibrated, bounds-guarded
+// generator (svgToGcode) the drawing tools use, with per-stroke pen assignment.
+(function calTest() {
+  var sec = document.querySelector('section[data-tab="caltest"]'); if (!sec) return;
+  var designSeg = document.getElementById('caltest-design'),
+      penSeg = document.getElementById('caltest-pen'),
+      sizeEl = document.getElementById('caltest-size'),
+      canvas = document.getElementById('caltest-canvas'),
+      info = document.getElementById('caltest-info'),
+      sendBtn = document.getElementById('caltest-send');
+  var design = 'vertical', penMode = 'all';
+
+  function circlePts(r, n) { var p = []; for (var i = 0; i <= n; i++) { var a = i / n * Math.PI * 2; p.push([r * Math.cos(a), r * Math.sin(a)]); } return p; }
+
+  // Returns [{pts:[[x,y]...], pen}] centred on (0,0) for the ALL-4 case (pens spread 1..4).
+  function gen(des, s) {
+    var h = s / 2, k = [], i;
+    if (des === 'vertical') {
+      for (i = 0; i < 4; i++) { var x = -h + (i + 0.5) * (s / 4); k.push({ pts: [[x, -h], [x, h]], pen: i + 1 }); }
+    } else if (des === 'horizontal') {
+      for (i = 0; i < 4; i++) { var y = -h + (i + 0.5) * (s / 4); k.push({ pts: [[-h, y], [h, y]], pen: i + 1 }); }
+    } else if (des === 'square') {
+      k.push({ pts: [[-h, -h], [h, -h], [h, h], [-h, h], [-h, -h]], pen: 1 });
+      k.push({ pts: [[-h, -h], [h, h]], pen: 2 });
+      k.push({ pts: [[h, -h], [-h, h]], pen: 3 });
+      k.push({ pts: [[0, -h], [0, h]], pen: 4 });
+      k.push({ pts: [[-h, 0], [h, 0]], pen: 4 });
+    } else if (des === 'circle') {
+      var rs = [h, h * 0.72, h * 0.46, h * 0.22];
+      for (i = 0; i < 4; i++) k.push({ pts: circlePts(rs[i], 48), pen: i + 1 });
+    } else { // crosshair
+      k.push({ pts: [[-h, -h], [h, -h], [h, h], [-h, h], [-h, -h]], pen: 1 });
+      k.push({ pts: [[0, -h], [0, h]], pen: 2 });
+      k.push({ pts: [[-h, 0], [h, 0]], pen: 3 });
+      var t = s * 0.13;
+      k.push({ pts: [[-h, -h], [-h + t, -h + t]], pen: 4 });
+      k.push({ pts: [[h, h], [h - t, h - t]], pen: 4 });
+    }
+    return k;
+  }
+  function applyPen(strokes) {
+    if (penMode === 'all') return strokes;
+    var p = parseInt(penMode, 10);
+    return strokes.map(function (st) { return { pts: st.pts, pen: p }; });
+  }
+  function toSVG(strokes) {
+    var paths = strokes.map(function (st) {
+      var d = 'M' + st.pts.map(function (q) { return q[0].toFixed(2) + ' ' + q[1].toFixed(2); }).join(' L');
+      return '<path d="' + d + '" fill="none" stroke="#000"/>';
+    }).join('');
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-200 -200 400 400">' + paths + '</svg>';
+  }
+  function render() {
+    var s = Math.max(20, parseFloat(sizeEl.value) || 150);
+    var strokes = applyPen(gen(design, s));
+    var ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var pad = 24, sc = (canvas.width - pad * 2) / s, cx = canvas.width / 2, cy = canvas.height / 2;
+    strokes.forEach(function (st) {
+      ctx.strokeStyle = penColor(st.pen); ctx.lineWidth = 2; ctx.beginPath();
+      st.pts.forEach(function (q, j) { var X = cx + q[0] * sc, Y = cy + q[1] * sc; if (j === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y); });
+      ctx.stroke();
+    });
+    info.innerHTML = '<b>' + design + '</b> · ' + Math.round(s) + ' mm · ' + (penMode === 'all' ? 'all 4 pens' : 'pen ' + penMode) + ' · ' + strokes.length + ' strokes';
+    return strokes;
+  }
+  designSeg.addEventListener('click', function (e) { var b = e.target.closest('.seg'); if (!b) return; design = b.dataset.design; Array.prototype.forEach.call(designSeg.children, function (x) { x.classList.toggle('active', x === b); }); render(); });
+  penSeg.addEventListener('click', function (e) { var b = e.target.closest('.seg'); if (!b) return; penMode = b.dataset.pen; Array.prototype.forEach.call(penSeg.children, function (x) { x.classList.toggle('active', x === b); }); render(); });
+  sizeEl.addEventListener('input', render);
+  sendBtn.addEventListener('click', async function () {
+    var strokes = render();
+    var po = {}; strokes.forEach(function (st, i) { po[i] = st.pen; });
+    sendBtn.disabled = true;
+    try {
+      var g = svgToGcode(toSVG(strokes), calibMM.anchor, calibMM.left, calibMM.right, { penOverride: po, penDir: penDir() });
+      if (!g) throw new Error('nothing to draw');
+      await streamDrawing(g);
+      showToast('Calibration test sent — drawing!', 'success');
+    } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    sendBtn.disabled = false;
+  });
+  render();
+})();
+
+// ===== Live wall-preview (fills in as the robot plots) =====
+(function livePreview() {
+  var wrap = document.getElementById('live-preview'), canvas = document.getElementById('live-canvas'),
+      label = document.getElementById('live-label');
+  if (!wrap || !canvas) return;
+  var ctx = canvas.getContext('2d');
+  function render() {
+    var pv = window._drawPreview;
+    var on = streamActive && pv && pv.pts && pv.pts.length > 1;
+    wrap.classList.toggle('hidden', !on);
+    if (!on) return;
+    var W = canvas.width, H = canvas.height, pad = 14;
+    var w = (pv.maxX - pv.minX) || 1, h = (pv.maxY - pv.minY) || 1;
+    var sc = Math.min((W - pad * 2) / w, (H - pad * 2) / h);
+    var ox = (W - w * sc) / 2 - pv.minX * sc, oy = (H - h * sc) / 2 - pv.minY * sc;
+    var pts = pv.pts;
+    var done = Math.max(1, Math.floor(pts.length * streamPct / 100));
+    ctx.clearRect(0, 0, W, H);
+    function seg(a, b, style, lw) { ctx.strokeStyle = style; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(a[0] * sc + ox, a[1] * sc + oy); ctx.lineTo(b[0] * sc + ox, b[1] * sc + oy); ctx.stroke(); }
+    var i;
+    for (i = 1; i < pts.length; i++) seg(pts[i - 1], pts[i], 'rgba(112,178,230,0.16)', 1);          // faint full path
+    for (i = 1; i < done && i < pts.length; i++) seg(pts[i - 1], pts[i], '#46c6f5', 1.6);            // bright completed
+    var hd = pts[Math.min(done, pts.length - 1)];
+    ctx.fillStyle = '#9be8ff'; ctx.beginPath(); ctx.arc(hd[0] * sc + ox, hd[1] * sc + oy, 2.6, 0, Math.PI * 2); ctx.fill();
+    label.textContent = (streamPaused ? 'Paused · ' : 'Drawing · ') + streamPct + '%';
+  }
+  setInterval(render, 250);
 })();
 
 // ===== First-run setup wizard =====
@@ -1960,13 +2419,13 @@ var HERO_ILLUS =
   '<circle cx="44" cy="26" r="5" fill="#cfe0f0"/>' +
   '<circle cx="236" cy="26" r="5" fill="#cfe0f0"/>' +
   '<g class="su-sway">' +
-    '<line x1="44" y1="26" x2="140" y2="92" stroke="#6f8fb0" stroke-width="1.5"/>' +
-    '<line x1="236" y1="26" x2="140" y2="92" stroke="#6f8fb0" stroke-width="1.5"/>' +
-    '<rect x="116" y="78" width="48" height="40" rx="9" fill="rgba(70,198,245,0.08)" stroke="#46c6f5" stroke-width="2"/>' +
-    '<circle cx="129" cy="96" r="3.2" fill="#6a3fb0"/>' +
-    '<circle cx="140" cy="94" r="3.2" fill="#2faf5a"/>' +
-    '<circle cx="151" cy="96" r="3.2" fill="#e23b3b"/>' +
-    '<circle cx="140" cy="108" r="3.2" fill="#1a1a1a"/>' +
+    '<line x1="44" y1="26" x2="140" y2="82" stroke="#6f8fb0" stroke-width="1.5"/>' +
+    '<line x1="236" y1="26" x2="140" y2="82" stroke="#6f8fb0" stroke-width="1.5"/>' +
+    '<circle cx="140" cy="98" r="23" fill="rgba(70,198,245,0.08)" stroke="#46c6f5" stroke-width="2"/>' +
+    '<circle cx="129" cy="90"  r="3.2" fill="#6a3fb0"/>' +
+    '<circle cx="144" cy="85"  r="3.2" fill="#2faf5a"/>' +
+    '<circle cx="129" cy="106" r="3.2" fill="#e23b3b"/>' +
+    '<circle cx="144" cy="111" r="3.2" fill="#1a1a1a" stroke="#9fb6cc" stroke-width="0.6"/>' +
   '</g>' +
   '<path class="su-draw su-draw-a" d="M64 152 q76 -54 152 0" fill="none" stroke="#46c6f5" stroke-width="2.6" stroke-linecap="round"/>' +
   '</svg>';
@@ -1979,9 +2438,9 @@ var MOUNT_ILLUS =
   '<circle cx="50" cy="30" r="6" fill="#cfe0f0"/>' +
   '<circle cx="230" cy="30" r="6" fill="#cfe0f0"/>' +
   '<g class="su-sway">' +
-    '<line x1="50" y1="30" x2="140" y2="108" stroke="#6f8fb0" stroke-width="1.5"/>' +
-    '<line x1="230" y1="30" x2="140" y2="108" stroke="#6f8fb0" stroke-width="1.5"/>' +
-    '<rect x="118" y="94" width="44" height="36" rx="8" fill="rgba(70,198,245,0.08)" stroke="#46c6f5" stroke-width="2"/>' +
+    '<line x1="50" y1="30" x2="140" y2="95" stroke="#6f8fb0" stroke-width="1.5"/>' +
+    '<line x1="230" y1="30" x2="140" y2="95" stroke="#6f8fb0" stroke-width="1.5"/>' +
+    '<circle cx="140" cy="112" r="21" fill="rgba(70,198,245,0.08)" stroke="#46c6f5" stroke-width="2"/>' +
     '<circle cx="140" cy="112" r="4" fill="#9fb6cc"/>' +
   '</g>' +
   '</svg>';
@@ -1991,11 +2450,13 @@ var PEN_ILLUS =
   '<svg viewBox="0 0 280 178" class="su-illus" aria-hidden="true">' +
   '<g transform="translate(140,92)">' +
     '<circle r="46" fill="none" stroke="#9fb6cc" stroke-width="2"/>' +
-    '<circle cx="0" cy="-46" r="9" fill="#6a3fb0"/>' +
-    '<circle cx="46" cy="0" r="8" fill="#2faf5a"/>' +
-    '<circle cx="0" cy="46" r="8" fill="#e23b3b"/>' +
-    '<circle cx="-46" cy="0" r="8" fill="#1a1a1a" stroke="#456" stroke-width="0.5"/>' +
-    '<circle class="su-ring" cx="0" cy="-46" r="9" fill="none" stroke="#46c6f5" stroke-width="2"/>' +
+    // 4 pens clustered; the empty 5th socket is the gap on the right (real layout)
+    '<circle cx="46" cy="0" r="7" fill="none" stroke="#9fb6cc" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>' +
+    '<circle cx="14"  cy="-44" r="9" fill="#6a3fb0"/>' +
+    '<circle cx="-37" cy="-27" r="8" fill="#2faf5a"/>' +
+    '<circle cx="-37" cy="27"  r="8" fill="#e23b3b"/>' +
+    '<circle cx="14"  cy="44"  r="8" fill="#1a1a1a" stroke="#456" stroke-width="0.5"/>' +
+    '<circle class="su-ring" cx="14" cy="-44" r="9" fill="none" stroke="#46c6f5" stroke-width="2"/>' +
   '</g>' +
   '<text x="140" y="168" fill="#9fb6cc" font-size="10" text-anchor="middle">slot 1 = the one at the back opening</text>' +
   '</svg>';
@@ -2682,7 +3143,7 @@ setInterval(pollStatus, 3000);
     saveSettings();
   }
   [u, size, feed, seg, pen, erase, ip, confirmEl, wall].forEach(function (el) { if (el) el.addEventListener('change', commit); });
-  if (wall) wall.addEventListener('input', function () { SETTINGS.wallColor = wall.value; applyWallColor(); }); // live preview while dragging the picker
+  if (wall) wall.addEventListener('input', function () { SETTINGS.wallColor = wall.value; applyWallColor(); var cw = document.getElementById('ca-wall'); if (cw) cw.value = wall.value; }); // live preview while dragging the picker
 
   // Keep the calibration unit toggle in sync with the global units setting.
   function syncCalibUnit() {

@@ -1,7 +1,7 @@
 <template>
   <div class="home">
     <div class="card welcome-card">
-      <h1>Welcome to UnBrickIt</h1>
+      <h1><GradientText :animation-speed="6">Welcome to UnBrickIt</GradientText></h1>
       <p class="subtitle">Manage your ScribIt device firmware and operations</p>
 
       <div v-if="!setupComplete" class="setup-required">
@@ -31,6 +31,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { isSetupComplete } from '../utils/appState'
+import GradientText from '../components/GradientText.vue'
 
 const setupComplete = ref(false)
 

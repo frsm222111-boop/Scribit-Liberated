@@ -38,11 +38,12 @@
         <!-- robot body + pen carousel -->
         <circle class="hw-body" cx="200" cy="132" r="28"/>
         <circle class="hw-ring" cx="200" cy="132" r="16"/>
-        <!-- four replaceable markers -->
-        <circle class="hw-pen p1" cx="200" cy="113" r="4.4"/>
-        <circle class="hw-pen p2" cx="219" cy="132" r="4.4"/>
-        <circle class="hw-pen p3" cx="200" cy="151" r="4.4"/>
-        <circle class="hw-pen p4" cx="181" cy="132" r="4.4"/>
+        <!-- four replaceable markers: real carousel layout — clustered with the
+             empty 5th socket as a gap on the right (matches the physical robot) -->
+        <circle class="hw-pen p1" cx="185" cy="121" r="4.4"/>
+        <circle class="hw-pen p2" cx="206" cy="114" r="4.4"/>
+        <circle class="hw-pen p3" cx="185" cy="143" r="4.4"/>
+        <circle class="hw-pen p4" cx="206" cy="150" r="4.4"/>
         <!-- pen tip to the wall -->
         <line class="hw-tip" x1="200" y1="160" x2="200" y2="178"/>
       </svg>
@@ -55,37 +56,32 @@
       </div>
     </header>
 
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="home">Home</button>
-      <span class="tab-group">① Set up</span>
-      <button class="tab" data-tab="calibration">Calibrate</button>
-      <button class="tab" data-tab="controls">Controls</button>
-      <button class="tab" data-tab="settings">Settings</button>
-      <span class="tab-group">② Create &amp; draw</span>
-      <button class="tab" data-tab="gallery">Gallery</button>
-      <button class="tab" data-tab="upload">Upload</button>
-      <button class="tab" data-tab="generative">Generative</button>
-      <button class="tab" data-tab="image">Image</button>
-      <button class="tab" data-tab="text">Text</button>
-      <button class="tab" data-tab="draw">Draw</button>
-      <button class="tab" data-tab="qr">QR</button>
-      <span class="tab-group">More</span>
-      <button class="tab" data-tab="about">Our Story</button>
-      <a class="tab-support" href="https://ko-fi.com/kshrx" target="_blank" rel="noopener">♥ Keep this alive</a>
+    <!-- Two-level nav: 4 primary areas up top, contextual sub-switcher below.
+         Sub-tabs are rendered by app.js from the GROUPS map so the section markup
+         (and all its element IDs / JS hooks) stays untouched. -->
+    <nav class="topnav" id="topnav">
+      <button class="navbtn active" data-group="home">Home</button>
+      <button class="navbtn" data-group="create">Create</button>
+      <button class="navbtn" data-group="setup">Setup</button>
+      <button class="navbtn" data-group="about">Our Story</button>
+      <a class="navbtn support" href="https://ko-fi.com/kshrx" target="_blank" rel="noopener">♥ Keep this alive</a>
     </nav>
+    <div class="subnav hidden" id="subnav"></div>
 
     <section class="home" data-tab="home">
       <svg viewBox="0 0 320 200" class="home-hero-svg" aria-hidden="true">
         <circle cx="48" cy="28" r="6" fill="#cfe0f0"/>
         <circle cx="272" cy="28" r="6" fill="#cfe0f0"/>
         <g class="su-sway">
-          <line x1="48" y1="28" x2="160" y2="100" stroke="#6f8fb0" stroke-width="1.5"/>
-          <line x1="272" y1="28" x2="160" y2="100" stroke="#6f8fb0" stroke-width="1.5"/>
-          <rect x="132" y="84" width="56" height="46" rx="10" fill="rgba(70,198,245,0.08)" stroke="#46c6f5" stroke-width="2"/>
-          <circle cx="147" cy="104" r="3.6" fill="#6a3fb0"/>
-          <circle cx="160" cy="102" r="3.6" fill="#2faf5a"/>
-          <circle cx="173" cy="104" r="3.6" fill="#e23b3b"/>
-          <circle cx="160" cy="117" r="3.6" fill="#1a1a1a"/>
+          <line x1="48" y1="28" x2="160" y2="90" stroke="#6f8fb0" stroke-width="1.5"/>
+          <line x1="272" y1="28" x2="160" y2="90" stroke="#6f8fb0" stroke-width="1.5"/>
+          <!-- circular body (matches the real robot) -->
+          <circle cx="160" cy="107" r="26" fill="rgba(70,198,245,0.08)" stroke="#46c6f5" stroke-width="2"/>
+          <!-- 4 markers clustered with the empty 5th socket as a gap on the right -->
+          <circle cx="148" cy="98"  r="3.6" fill="#6a3fb0"/>
+          <circle cx="165" cy="93"  r="3.6" fill="#2faf5a"/>
+          <circle cx="148" cy="116" r="3.6" fill="#e23b3b"/>
+          <circle cx="165" cy="121" r="3.6" fill="#1a1a1a" stroke="#9fb6cc" stroke-width="0.6"/>
         </g>
         <path class="su-draw su-draw-a" d="M72 168 q88 -58 176 0" fill="none" stroke="#46c6f5" stroke-width="2.8" stroke-linecap="round"/>
       </svg>
@@ -152,7 +148,26 @@
         <div id="color-assign-list" class="ca-list"></div>
         <label class="paint-toggle"><input type="checkbox" id="paint-toggle"> Paint shapes by hand (click/drag to color individual shapes)</label>
         <div id="paint-palette" class="paint-palette hidden"></div>
+        <div class="ca-wall-row">
+          <label for="ca-wall">Preview wall color</label>
+          <input type="color" id="ca-wall" class="set-input" title="Tint this preview to match your wall (also set in Settings)">
+        </div>
         <div id="ca-preview" class="ca-preview"></div>
+      </div>
+
+      <div id="place-on-wall" class="place-wall hidden">
+        <h3>Place on wall</h3>
+        <p class="pw-hint">Drag the drawing to where you want it on the wall. The box is your drawing's real size; the blue dot is the robot, the green dashed box is your set canvas.</p>
+        <svg id="pw-map" class="pw-map" preserveAspectRatio="xMidYMid meet" aria-label="wall placement map"></svg>
+        <div class="pw-row pw-scale-row">
+          <label for="pw-scale" class="pw-scale-label">Size</label>
+          <input type="range" id="pw-scale" class="pw-scale" min="0.25" max="3" step="0.05" value="1">
+          <span id="pw-scale-val" class="pw-readout">1.00×</span>
+        </div>
+        <div class="pw-row">
+          <span id="pw-readout" class="pw-readout">—</span>
+          <button id="pw-center" type="button" class="btn-toggle">Center on robot</button>
+        </div>
       </div>
 
       <div id="gcode-preview-wrap" class="gcode-preview-wrap hidden">
@@ -435,12 +450,6 @@
         <div id="pen-rack" class="pen-rack"></div>
       </div>
 
-      <div class="testpattern-panel">
-        <h3 class="pen-rack-title">Calibration Test</h3>
-        <p class="pen-rack-hint">Draws a 120 mm square + inscribed circle + center cross. The square should be square and the circle round — if not, re-check your calibration.</p>
-        <button id="btn-testpattern" class="btn secondary">Draw Test Pattern</button>
-      </div>
-
       <label class="toggle-row pen-invert-row">
         <input type="checkbox" id="pen-invert">
         <span class="toggle-label">Invert pen rotation</span>
@@ -463,6 +472,42 @@
             <span class="info-value" id="info-firmware">—</span>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="caltest" data-tab="caltest">
+      <h2>Calibration Test</h2>
+      <p class="section-hint">Draw a known shape to check your calibration — squareness, roundness, centering, and that every pen presses. Pick a design and which pen(s) to use.</p>
+
+      <div class="seg-toggle" id="caltest-design">
+        <button type="button" class="seg active" data-design="vertical">Vertical</button>
+        <button type="button" class="seg" data-design="horizontal">Horizontal</button>
+        <button type="button" class="seg" data-design="square">Square + X</button>
+        <button type="button" class="seg" data-design="circle">Circle</button>
+        <button type="button" class="seg" data-design="crosshair">Crosshair</button>
+      </div>
+
+      <label class="caltest-lbl">Pen</label>
+      <div class="seg-toggle" id="caltest-pen">
+        <button type="button" class="seg active" data-pen="all">All 4</button>
+        <button type="button" class="seg" data-pen="1">Pen 1</button>
+        <button type="button" class="seg" data-pen="2">Pen 2</button>
+        <button type="button" class="seg" data-pen="3">Pen 3</button>
+        <button type="button" class="seg" data-pen="4">Pen 4</button>
+      </div>
+
+      <div class="gen-row">
+        <label for="caltest-size">Size (mm)</label>
+        <input type="number" id="caltest-size" value="150" min="40" max="1000">
+      </div>
+
+      <div class="gen-preview-wrap">
+        <canvas id="caltest-canvas" width="320" height="320"></canvas>
+        <div id="caltest-info" class="gen-info">—</div>
+      </div>
+
+      <div class="gen-actions">
+        <button id="caltest-send" class="btn primary">Draw Test</button>
       </div>
     </section>
 
@@ -544,6 +589,27 @@
       </div>
       <button id="calib-center" class="btn secondary calib-center-btn">⊕ Center robot on wall</button>
       <p class="section-hint">Moves the robot to the midpoint between the anchors — the most accurate spot to draw (equal strings = least distortion). Drawings then center there.</p>
+
+      <div class="jog-card">
+        <div class="jog-head">
+          <h3 class="jog-title">Manual move</h3>
+          <span class="jog-pos" id="jog-pos">position unknown</span>
+        </div>
+        <div class="seg-toggle jog-steps" id="jog-steps">
+          <button type="button" class="seg" data-mm="25.4">1″</button>
+          <button type="button" class="seg active" data-mm="152.4">6″</button>
+          <button type="button" class="seg" data-mm="304.8">12″</button>
+          <button type="button" class="seg" data-mm="609.6">24″</button>
+        </div>
+        <div class="jog-pad">
+          <button type="button" class="jog-btn jb-up"    id="jog-up"    aria-label="move up">▲</button>
+          <button type="button" class="jog-btn jb-left"  id="jog-left"  aria-label="move left">◀</button>
+          <span class="jog-hub" aria-hidden="true">✛</span>
+          <button type="button" class="jog-btn jb-right" id="jog-right" aria-label="move right">▶</button>
+          <button type="button" class="jog-btn jb-down"  id="jog-down"  aria-label="move down">▼</button>
+        </div>
+        <p class="section-hint">Nudge the robot with the pen up — true up / down / left / right. The tracked position updates after each move. Make sure pens are lifted first.</p>
+      </div>
     </section>
 
     <section class="about" data-tab="about">
@@ -610,6 +676,22 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
+
+  <!-- Live wall-preview: the drawing fills in on-screen as the robot plots it. -->
+  <div id="live-preview" class="livewrap hidden">
+    <div class="live-head"><span class="live-dot"></span><span id="live-label">Live preview</span></div>
+    <canvas id="live-canvas" width="240" height="180"></canvas>
+  </div>
+
+  <!-- Persistent draw action bar: appears whenever the robot is drawing so Pause/Stop
+       are always one tap away, no matter which tab you're on. -->
+  <div id="draw-actionbar" class="actionbar hidden">
+    <span class="ab-dot"></span>
+    <span class="ab-status" id="ab-status">Drawing…</span>
+    <span class="ab-pct" id="ab-pct"></span>
+    <button id="ab-pause" class="ab-btn ab-pause" type="button">⏸ Pause</button>
+    <button id="ab-stop" class="ab-btn ab-stop" type="button">■ Stop</button>
+  </div>
 
   <script src="qrcode.js"></script>
   <script src="app.js"></script>

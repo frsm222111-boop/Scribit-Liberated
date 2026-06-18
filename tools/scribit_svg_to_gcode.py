@@ -631,13 +631,27 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
     gcode_lines = [
         "M17",      # Enable steppers
         "G91",      # Ensure relative mode
-        "G1 F1000", # Set feedrate
+        "G1 F600", # Set feedrate
     ]
 
     current_L = left_length
     current_R = right_length
     pen_z_relative = 0  # Track relative Z position (0 = up, -30 = down)
     current_pen = 1
+
+    # Global bounding box across ALL paths, so every path/colour keeps its true
+    # relative position. (Centring each path on its own centroid makes every
+    # colour stack on the same point — broken for any multi-path drawing.)
+    g_min_x = g_min_y = float('inf')
+    g_max_x = g_max_y = float('-inf')
+    for _pd_data, _pen in paths:
+        for _px, _py, _down in parse_path_to_points(_pd_data, resolution=resolution):
+            g_min_x = min(g_min_x, _px); g_max_x = max(g_max_x, _px)
+            g_min_y = min(g_min_y, _py); g_max_y = max(g_max_y, _py)
+    if g_min_x == float('inf'):
+        g_min_x = g_max_x = g_min_y = g_max_y = 0.0
+    svg_center_x = (g_min_x + g_max_x) / 2
+    svg_center_y = (g_min_y + g_max_y) / 2
 
     # Process each path
     for path_data, pen_number in paths:
@@ -655,34 +669,30 @@ def svg_to_gcode(svg_file, anchor_distance, left_length, right_length,
             # Calculate pen distance (how many pens to move forward)
             pen_distance = pen_number - current_pen
 
-            # Handle wrap-around: pen4 → pen1
+            # The carousel stepper STALLS at normal feedrate — rotate it SLOWLY
+            # with a settle pause after each 72° step (this is the pattern that
+            # completed reliably in hardware testing; F1000 jams every time).
+            # HARDWARE-VERIFIED pen change: rotate SLOWLY (the stepper stalls at
+            # normal speed) with a settle pause per step, and NO overshoot (the
+            # Z60/Z-60 overshoot is what was jamming the carousel). The slot the
+            # rotation lands on is already the pen-up position, ready to draw.
+            gcode_lines.append("G1 F300")
             if current_pen == 4 and pen_number == 1:
-                # Special case: double rotation for pen4 → pen1
-                gcode_lines.append("G1 Z72")   # First rotation
-                gcode_lines.append("G1 Z72")   # Second rotation
-                gcode_lines.append("G1 Z60")   # Overshoot
-                gcode_lines.append("G1 Z-60")  # Return to engage → pen1 up
+                rot_steps = 2                       # pen4 → pen1 skips the empty gap (double 72°)
             else:
-                # Normal case: move to next pen(s)
-                # Each pen is 72° away, add 60° overshoot, return -60°
-                for _ in range(abs(pen_distance)):
-                    gcode_lines.append("G1 Z72")   # Rotate to next pen
-                gcode_lines.append("G1 Z60")       # Overshoot
-                gcode_lines.append("G1 Z-60")      # Return to engage → next pen up
+                rot_steps = abs(pen_distance)
+            for _ in range(rot_steps):
+                gcode_lines.append("G1 Z72")        # rotate one slot
+                gcode_lines.append("G4 P1500")      # let the mechanism settle
+            gcode_lines.append("G1 F600")          # restore drawing feedrate
 
             current_pen = pen_number
             pen_z_relative = 0  # After switch, always at pen up
 
         points = parse_path_to_points(path_data, resolution=resolution)
 
-        # Find SVG bounding box to center the drawing
-        if points:
-            svg_min_x = min(p[0] for p in points)
-            svg_max_x = max(p[0] for p in points)
-            svg_min_y = min(p[1] for p in points)
-            svg_max_y = max(p[1] for p in points)
-            svg_center_x = (svg_min_x + svg_max_x) / 2
-            svg_center_y = (svg_min_y + svg_max_y) / 2
+        # (Centre is the global bounding-box centre computed once above, so all
+        # colours keep their relative layout instead of stacking.)
 
         for svg_x, svg_y, pen_down in points:
             # Handle pen up/down (CORRECTED METHOD)

@@ -49,6 +49,7 @@ private:
     bool m_smartCylinder;
     bool m_rawStream;      //True while a browser-driven RAM stream (/stream + /gcode) is active
     bool m_rawStreamDone;  //True once the browser has signalled it sent the last line
+    long m_lastStreamSeq;  //Highest /gcode stream seq accepted; dedupes idempotent retries
     String m_samdLog[SI_SAMD_LOG_N];   //Recent interesting SAMD reply lines (debug)
     uint8_t m_samdLogHead;             //Next write index into m_samdLog
 #ifdef SI_DEBUG_BUILD
@@ -217,6 +218,15 @@ public:
      * @brief True while a browser-driven RAM stream is active.
      */
     bool isRawStreaming() { return m_rawStream; }
+
+    /**
+     * @brief Highest /gcode stream sequence number accepted so far. The browser tags
+     * each streamed line with an increasing seq; resends of a seq <= this are
+     * duplicates (a retried request whose ack was lost) and must NOT be re-queued,
+     * so a dropped/slow request can be retried safely without double-drawing a move.
+     */
+    long lastStreamSeq() { return m_lastStreamSeq; }
+    void setLastStreamSeq(long s) { m_lastStreamSeq = s; }
 
     /**
      * @brief Returns recent interesting SAMD21 reply lines (oldest first), for the

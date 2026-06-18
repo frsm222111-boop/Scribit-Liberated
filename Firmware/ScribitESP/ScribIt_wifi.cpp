@@ -247,6 +247,15 @@ void ScribIt::handleHTTPRequests()
         path = reqLine.substring(firstSpace + 1, secondSpace);
     }
 
+    //Split off any query string (e.g. /gcode?n=123) so route matching stays clean
+    String query = "";
+    int qMark = path.indexOf('?');
+    if (qMark >= 0)
+    {
+        query = path.substring(qMark + 1);
+        path = path.substring(0, qMark);
+    }
+
     //Read headers
     uint16_t contentLen = 0;
     while (client.available())
@@ -470,15 +479,35 @@ void ScribIt::handleHTTPRequests()
                 gcodeCmd += c;
                 bytesRead++;
             }
-            // Report whether the line was accepted so the browser can apply
-            // backpressure (the extra-line buffer is small; a "full" reply means retry).
-            bool accepted = sm.addLineToStream(gcodeCmd.c_str());
+            // Optional idempotency: the browser tags each streamed line with an
+            // increasing sequence (?n=NNN). If a request's ack is lost the browser
+            // re-sends the SAME seq; we must ack it WITHOUT re-queuing, or a retried
+            // relative move would be drawn twice. seq <= last accepted = duplicate.
+            long seq = -1;
+            if (query.startsWith("n="))
+                seq = query.substring(2).toInt();
+
+            const char *status;
+            if (seq >= 0 && seq <= sm.lastStreamSeq())
+            {
+                // Duplicate (already accepted) — ack as queued, do not re-add.
+                status = "queued";
+            }
+            else
+            {
+                // Report whether the line was accepted so the browser can apply
+                // backpressure (the extra-line buffer is small; "full" means retry).
+                bool accepted = sm.addLineToStream(gcodeCmd.c_str());
+                if (accepted && seq >= 0)
+                    sm.setLastStreamSeq(seq);   //Advance only on real acceptance
+                status = accepted ? "queued" : "full";
+            }
 
             client.println("HTTP/1.1 200 OK");
             client.println("Content-Type: application/json");
             client.println("Access-Control-Allow-Origin: *");
             client.println();
-            client.printf("{\"status\":\"%s\",\"len\":%d}\n", accepted ? "queued" : "full", bytesRead);
+            client.printf("{\"status\":\"%s\",\"len\":%d}\n", status, bytesRead);
         }
     }
     else if (path == "/stream/start" && method == "POST")

@@ -17,6 +17,7 @@ SISerialManager::SISerialManager() :
     m_penSensitivity(true),
     m_rawStream(false),
     m_rawStreamDone(false),
+    m_lastStreamSeq(0),
     m_samdLogHead(0)
 {};
 
@@ -461,6 +462,7 @@ void SISerialManager::beginRawStream()
     m_lineNumber = 0;
     m_rawStreamDone = false;
     m_rawStream = true;
+    m_lastStreamSeq = 0;   //Reset idempotent-retry sequence for the new stream
     //Keep stream "open" so the main loop treats us as printing until we finish
     m_streamEnded = false;
 }

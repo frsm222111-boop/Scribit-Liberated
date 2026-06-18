@@ -1,4 +1,4 @@
-# Reddit post — draft
+# Reddit post — draft (v1.7.0)
 
 Post to r/scribit (and consider crossposting to r/plotters, r/functionalprint, r/3Dprinting for reach).
 Reddit hates ads — keep it personal and useful, lead with the story, put links at the bottom.
@@ -11,8 +11,9 @@ the wall). Reddit ranks image/video posts far higher than link posts.
 
 ## Title (pick one)
 
-- **My Scribit was bricked when the company died — so I rebuilt the software. It now runs 100% offline, free. (multi-color, gallery, paint-your-own)**
-- **Brought a dead Scribit back to life: local-only firmware + browser control panel, no cloud, no account. Open source + pay-what-you-want.**
+- **My Scribit got bricked when the company folded — so I rebuilt the software. It now runs 100% offline and free: multi-color, a gallery, paint-your-own, and it draws on any wall.**
+- **Brought a dead Scribit back to life — local-only firmware + a full browser control panel. No cloud, no account. Open source, pay-what-you-want.**
+- **They killed the cloud and bricked thousands of Scribits. I rebuilt it to run entirely on your own wall — multi-color, generative art, live drawing preview. (open source)**
 
 ## Body
 
@@ -27,20 +28,29 @@ What it does now:
 - **Paint mode** — upload an SVG and *click or drag to color individual shapes* with the pen you want
 - **~70 ready-to-draw designs** + a generative art studio (spirographs, flow fields, mazes, Hilbert curves…)
 - **Photo → line art**, **text → line art**, **freehand draw**, and **QR codes**
+- **A built-in Calibration Test** — 5 patterns (lines, square, circle, crosshair) on one pen or all four, to dial in squareness and roundness
+- **Pause & resume mid-drawing** — stop to swap a dried marker or make an adjustment, then pick up right where it left off
+- **A live on-screen preview** that fills in as the robot plots, with progress and an always-handy Stop
+- **Rock-solid over Wi-Fi** — drawings used to die partway through on a flaky hotspot; now a hiccup just pauses and resumes instead of killing the job
 - **Emergency stop** and a stop that actually halts mid-move
 
 It's **free and open source (GPLv3)** and always will be. It also ate hundreds of hours, so it's pay-what-you-want if it saves your robot — totally optional.
 
 Happy to answer questions, help anyone flash theirs, or take feature requests. If your Scribit is bricked, it's very likely recoverable.
 
-**Code & flashing guide:** https://github.com/karimi/unbrickit
+**Code & flashing guide:** https://github.com/frsm222111-boop/Scribit-Liberated
+**Ready-to-flash firmware (v1.7.0):** https://github.com/frsm222111-boop/Scribit-Liberated/releases/tag/v1.7.0
 **If it saved your robot (optional):** https://ko-fi.com/kshrx
 
 ---
 
 ## First-comment (drop the "what changed recently" so the main post stays clean)
 
-Recent additions if you've used UnBrickIt before: paint-mode per-shape coloring, the whole UI is now
-gzip-compressed (loads way faster over the robot's hotspot), no more stale-cache after updates, an
-emergency stop, persistent calibration ("calibrate once"), and a first-run setup guide. Full changelog
-is in the repo.
+Recent additions in v1.7.0 if you've used UnBrickIt before: the whole control panel was reorganized
+(12 tabs → 4 clean areas) and got a facelift; a built-in Calibration Test (5 designs, single pen or
+all 4); Pause/Resume mid-draw; a live wall-preview that fills in as it plots; and a big reliability
+fix — drawings are streamed line-by-line and now retry on a Wi-Fi hiccup instead of aborting, plus a
+fix for pens that would stop pressing on long jobs (the motion chip was auto-disabling the pen-cam
+after 120s idle). Earlier additions: paint-mode per-shape coloring, gzip-compressed UI (loads fast
+over the robot's hotspot), no stale-cache after updates, emergency stop, persistent calibration
+("calibrate once"), and a first-run setup guide. Full changelog is in the repo.
