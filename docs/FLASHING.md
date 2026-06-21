@@ -15,24 +15,28 @@ This guide flashes the firmware onto an already‑**UnBrickIt'd** Scribit (a rob
 
 ---
 
-## Step 1 — Get the firmware binary
+## Step 1 — Get the two files you need
 
-**Option A — Prebuilt (recommended).** Download `ScribitESP.ino.bin` from the project's Releases page.
+You need **two** files: the firmware (`ScribitESP.ino.bin`) and the flasher (`espota.py`).
+Put them **in the same folder** and run everything from there — the commands below assume that.
 
-**Option B — Build from source** (needs Docker):
+**1. Firmware — `ScribitESP.ino.bin`**
+Download it from the [**Releases page**](https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest).
 
-```bash
-# regenerate the embedded web UI, then compile
-python tools/gen_web_ui.py
-MSYS_NO_PATHCONV=1 docker compose -f docker/docker-compose.yml run --rm scribit-firmware \
-  arduino-cli compile --fqbn briki:mbc-wb:mbc:mcu=esp \
-  --output-dir /workspace/builds /workspace/source/Firmware/ScribitESP/ScribitESP.ino
-# result: docker/builds/ScribitESP.ino.bin
-```
+**2. Flasher — `espota.py`** ⚠️ **Use the one from this project — not a random copy off the internet.**
+Other versions of `espota.py` reject this board's response (you'll see `Bad Answer: OK <number>`
+even though the robot is fine). The version that works is in the repo at:
+`gui-app/resources/python/espota.py` — and it's also attached to the
+[Releases page](https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest) next to the firmware, so you can grab both in one place.
 
-> On Windows, run the Docker command from **PowerShell**, not Git‑Bash.
-
-The flasher script `espota.py` is included at `gui-app/resources/python/espota.py`.
+> **Build from source instead?** (needs Docker, optional) From the repo root, run in **PowerShell** (not Git-Bash):
+> ```bash
+> python tools/gen_web_ui.py
+> docker compose -f docker/docker-compose.yml run --rm scribit-firmware \
+>   arduino-cli compile --fqbn briki:mbc-wb:mbc:mcu=esp \
+>   --output-dir /workspace/builds /workspace/source/Firmware/ScribitESP/ScribitESP.ino
+> ```
+> The result lands at `docker/builds/ScribitESP.ino.bin`.
 
 ---
 
@@ -58,10 +62,12 @@ This is the part the old docs get wrong. OTA mode lives in the **bootloader** an
 
 ## Step 5 — Flash
 
+From the folder where you put both files (Step 1):
+
 ```bash
-python gui-app/resources/python/espota.py \
+python espota.py \
   -i 192.168.240.1 -I 192.168.240.100 -p 3232 \
-  -f docker/builds/ScribitESP.ino.bin -r -d
+  -f ScribitESP.ino.bin -r -d
 ```
 
 - `-i 192.168.240.1` — the robot in OTA mode.
