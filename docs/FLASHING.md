@@ -128,6 +128,7 @@ pen-down. Pen-down depth on these units is **`Z-30`** (deeper just re-indexes th
 
 | Symptom | Fix |
 | --- | --- |
+| `espota` says **`Bad Answer: OK <number>`** | You're using the **wrong `espota.py`**. A stock/random copy does an exact `"OK"` match and chokes on this board's reply (the robot is actually fine — that `<number>` is the firmware size it accepted). Use the `espota.py` from this project (attached to the [Releases page](https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest), or `gui-app/resources/python/espota.py`). See Step 1. |
 | Transfer dies partway (e.g. 27 %) | Weak Wi‑Fi — move the robot closer to the PC. |
 | `espota` says **"Listen Failed"** | The `-I` value must be your PC's **real** IP on the robot's network. The static IP (`192.168.240.100`) needs **admin** — if it didn't apply, your adapter got a **DHCP** address instead (check `ipconfig`; usually `192.168.240.x`). Re‑run with `-I <that address>`. (The bundled `flash_esp_fast.ps1` now auto‑detects this.) |
 | Flash never starts | The button isn't held, or you're on the wrong network. Re‑enter OTA (Step 3) and retry. |
