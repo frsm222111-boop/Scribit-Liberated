@@ -27,6 +27,8 @@ A complete, offline control panel served straight from the robot's flash (no app
 
 ## Quick start
 
+> **New to this? You do _not_ need to flash "UnBrickIt" separately first.** Scribit Liberated **is** the firmware (built on UnBrickIt) — you flash it directly. Works on a brand‑new/stock Scribit *and* one already converted to local mode; only the way you enter update mode differs (the flashing guide covers both).
+
 1. **Flash the firmware** — follow the **[Flashing guide](docs/FLASHING.md)**.
 2. **Connect** to the robot's Wi‑Fi (or your network) and open its IP in a browser.
 3. **Calibrate**, load a pen, and draw.

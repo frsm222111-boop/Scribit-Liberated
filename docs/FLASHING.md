@@ -1,16 +1,33 @@
 # Flashing Scribit Liberated (OTA)
 
-This guide flashes the firmware onto an already‑**UnBrickIt'd** Scribit (a robot already running local‑mode firmware) over Wi‑Fi (OTA). It does **not** require opening the robot or a USB cable.
+This guide flashes the firmware onto a Scribit over Wi‑Fi (OTA). It does **not** require opening the robot or a USB cable.
 
 > ⚠️ **Read this first.** Flashing carries a small risk of bricking the device, and there is **no warranty** (GPLv3). Flash at your own risk. The single most common cause of a failed flash is a **weak Wi‑Fi signal** or **letting go of the button** — both covered below.
 
 ---
 
+## Do I need to flash UnBrickIt first? (start here)
+
+**No — you don't need a separate "UnBrickIt" step.** Scribit Liberated **is** the firmware (it's built on the open‑source UnBrickIt project). You flash this directly onto the robot; there is no in‑between firmware to install.
+
+The only thing that differs is **how you put the robot into OTA (update) mode**, and that depends on what it's running right now:
+
+| Your Scribit | How to enter OTA mode | Follow |
+| --- | --- | --- |
+| **Brand‑new / never modified** (still uses the original app + cloud) | Connect to its `ScribIt‑xxxxxx` Wi‑Fi and **POST your Wi‑Fi credentials to `:8888`** to trigger update mode | **[Path B — stock unit](#path-b--brand-new--stock-scribit)** below |
+| **Already on local firmware** (you or a previous owner already converted it; UI loads at `192.168.240.1:8888`) | **Hold the LED button** through power‑on | **Path A — Steps 3–6** below |
+
+Either way you end up on the same `MBC‑WB‑xxxxxx` network and flash the same `ScribitESP.ino.bin`.
+
+> **Heads‑up / honesty:** this firmware has been developed and tested mostly on units **already converted to local mode**. The stock‑unit steps (Path B) use the original documented OTA‑trigger method and should work, but they're **less battle‑tested** — go slowly and at your own risk. If you hit a wall, open an issue and we'll help.
+
+---
+
 ## What you need
 
-- A Scribit already running UnBrickIt / local‑mode firmware (its normal Wi‑Fi looks like `ScribIt‑xxxxxx`).
+- A Scribit (any state — see the table above).
 - A Windows/Mac/Linux PC with **Python 3** and **Wi‑Fi**.
-- The firmware binary `ScribitESP.ino.bin` — either from a **release** (recommended) or built from source (below).
+- The firmware binary `ScribitESP.ino.bin` **and** the flasher `espota.py` — both on the [Releases page](https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest) (see Step 1).
 - ~10 minutes and a way to **hold the LED button down** (tape or a clamp helps).
 
 ---
@@ -44,9 +61,13 @@ even though the robot is fine). The version that works is in the repo at:
 
 Put the robot **within a few feet** of your computer. The transfer is ~1 MB and a weak signal will drop it part‑way (a far‑away attempt can die at 27 %). You want a strong, stable signal.
 
-## Step 3 — Enter OTA (bootloader) mode — and KEEP HOLDING
+## Step 3 — Enter OTA (update) mode
 
-This is the part the old docs get wrong. OTA mode lives in the **bootloader** and is active **only while the LED button is physically held**:
+Pick the path that matches your robot (see the table at the top).
+
+### Path A — already on local firmware → KEEP HOLDING the button
+
+OTA mode lives in the **bootloader** and is active **only while the LED button is physically held**:
 
 1. **Unplug** the robot.
 2. **Press and hold** the LED button.
@@ -54,6 +75,20 @@ This is the part the old docs get wrong. OTA mode lives in the **bootloader** an
 4. The LED stays **off** → you're in OTA mode. A Wi‑Fi network named **`MBC‑WB‑xxxxxx`** appears and stays up **only while the button is held**.
 
 > **Do not let go.** Releasing the button exits OTA (the LED will start flashing = the wrong mode). Releasing mid‑flash is the #1 failure. **Tape or clamp the button down** so it can't slip during the ~90‑second flash.
+
+### Path B — brand‑new / stock Scribit (still on the original cloud firmware)
+
+A stock unit enters OTA mode a different way — by being *told* to, over HTTP, instead of the button‑hold:
+
+1. **Power on** the robot normally. If it isn't already broadcasting `ScribIt‑xxxxxx`, hold the LED button ~5s until the LED **pulses white**, then release — it should broadcast `ScribIt‑xxxxxx` (AP mode).
+2. **Connect your PC** to that `ScribIt‑xxxxxx` network (password `ScribItAP314`, or open).
+3. **Trigger OTA** by posting any Wi‑Fi credentials to the device (the values don't have to be real — this just flips it into update mode):
+   ```bash
+   curl -X POST http://192.168.240.1:8888 -H "Content-Type: application/json" -d "{\"ssid\":\"x\",\"password\":\"x\"}"
+   ```
+4. The LED **flashes faster** and the robot now broadcasts **`MBC‑WB‑xxxxxx`**. You're in OTA mode — continue to Step 4. (No button‑holding needed on this path.)
+
+> This is the original cloud firmware's documented OTA trigger; once you've flashed Scribit Liberated, future updates use **Path A** (button‑hold) instead.
 
 ## Step 4 — Connect your PC to the robot + set a static IP
 
