@@ -33,6 +33,29 @@ A complete, offline control panel served straight from the robot's flash (no app
 
 Detailed usage lives in the **[Scribit user guide](docs/SCRIBIT_USER_GUIDE.md)**.
 
+## FAQ / Troubleshooting
+
+**Flashing fails with `Bad Answer: OK <number>`.**
+You're using the wrong `espota.py`. A stock/random copy does an exact `"OK"` match and chokes on this board's reply — the robot is actually fine (that number is the firmware size it accepted). Use the `espota.py` **attached to the [latest release](../../releases/latest)** (or `gui-app/resources/python/espota.py`). See the [Flashing guide](docs/FLASHING.md).
+
+**Flashing says "Listen Failed" or never connects.**
+Pass `-I <your PC's real IP on the robot's 192.168.240.x network>`. If your computer is on Wi‑Fi *and* Ethernet, OTA needs to know which interface to use. Also keep the LED button **held** the whole time (tape it) — the `MBC‑WB‑xxxxxx` network drops the instant you let go.
+
+**The web UI says "drawing" but the robot doesn't move.**
+Almost always the **carousel-homing step**: every drawing starts with a `G77` that homes the pen carousel and takes **60–90 seconds** with no XY travel. Give it ~90s before it starts the actual drawing. If it still won't move: make sure you've **calibrated** (Setup → Calibrate → Apply), and only drive it from **one device/tab at a time** (the robot's web server is single‑threaded).
+
+**The robot moves but the pen never presses (nothing draws).**
+Fixed in **v1.7.0** — older builds let the motion chip auto‑disable the pen‑cam after 120s idle. Update to the [latest release](../../releases/latest). Also check each marker is seated firmly; you can nudge **Pen press depth** in Settings if a pen barely grazes the wall.
+
+**A drawing stops partway through.**
+Also fixed in **v1.7.0** (drawings now retry over a Wi‑Fi hiccup instead of aborting). Update, keep the robot close to your PC for a strong signal, and keep the controlling device's screen awake.
+
+**The control panel loads blank or looks like an old version after updating.**
+Fully close the browser tab and reopen `http://192.168.240.1:8888/` (or hard‑refresh) so it loads the new page instead of a cached one.
+
+**Can I reach it without switching Wi‑Fi networks?**
+Not yet — the robot serves its panel over its own Wi‑Fi AP. A "join your home Wi‑Fi" mode is on the roadmap.
+
 ## Safety & disclaimer
 
 Flashing firmware carries a risk of bricking your device. This software is provided **as‑is, with no warranty** (see the GPLv3). You flash and operate your robot **at your own risk**. Keep the robot within a few feet of your PC during flashing (weak Wi‑Fi drops the transfer), and read the flashing guide fully before starting.
