@@ -2,6 +2,15 @@
 
 **Your robot. Your wall. No cloud, no company, no permission.**
 
+<p align="center">
+  <a href="https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest"><img src="https://img.shields.io/github/v/release/frsm222111-boop/Scribit-Liberated?label=%E2%AC%87%EF%B8%8F%20download%20firmware&color=46c6f5&style=for-the-badge" alt="Download the latest firmware"></a>
+  <a href="https://github.com/frsm222111-boop/Scribit-Liberated/releases"><img src="https://img.shields.io/github/downloads/frsm222111-boop/Scribit-Liberated/total?label=total%20downloads&color=46c6f5&style=for-the-badge" alt="Total downloads"></a>
+  <a href="https://ko-fi.com/kshrx"><img src="https://img.shields.io/badge/%F0%9F%92%9B%20support-ko--fi-ff5e5b?style=for-the-badge" alt="Support on Ko-fi"></a>
+</p>
+
+> ### ⬇️ [**Download the firmware (latest release)**](https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest) &nbsp;·&nbsp; 📖 [**Flashing guide**](docs/FLASHING.md)
+> New here? You **don't** flash "UnBrickIt" first — this **is** the firmware. Grab the two files from the release and follow the guide.
+
 Scribit Liberated is community firmware plus an in‑browser control panel that brings the **Scribit** writing/drawing wall‑robot back to life after the original company abandoned it — the cloud went dark, the app and website lapsed, and thousands of robots people paid hundreds of dollars for turned into bricks overnight.
 
 This project cuts the cord. Your Scribit runs **100 % locally**, controlled from any browser on your network. No account, no internet, nothing phoning home.

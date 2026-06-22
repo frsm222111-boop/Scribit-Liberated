@@ -19,6 +19,8 @@ the wall). Reddit ranks image/video posts far higher than link posts.
 
 When Scribit's company folded, the cloud went dark and our robots turned into expensive wall ornaments — no app, no website, nothing. I refused to let mine become a brick, so I’ve been rebuilding the software around the open-source UnBrickIt project.
 
+> **One thing up front (people keep asking):** you do **not** flash "UnBrickIt" first. **Scribit Liberated _is_ the firmware you flash** — UnBrickIt is just the open-source project it's built on, not a separate step. It works on a brand-new/stock Scribit *and* one already converted to local mode; the only difference is how you put it into update mode, and the flashing guide covers both.
+
 It now runs **100% locally** — the control panel is served straight off the robot's own flash, so you just connect to its Wi-Fi and open it in any browser. No account, no internet, nothing phoning home.
 
 What it does now:
@@ -43,6 +45,10 @@ Happy to answer questions, help anyone flash theirs, or take feature requests. I
 **If it saved your robot (optional):** https://ko-fi.com/kshrx
 
 ---
+
+## Pinned/first-comment FAQ — "do I need to flash UnBrickIt first?"
+
+> Short answer: **no.** Scribit Liberated **is** the firmware — you flash it directly, whether your Scribit is brand-new/stock or already converted. There's no separate "UnBrickIt" install in between (it's just the open-source project this is built on). Grab two files from the [Releases page](https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest) — the firmware `ScribitESP.ino.bin` **and** the bundled `espota.py` (use that one, not a random copy) — and follow the [Flashing guide](https://github.com/frsm222111-boop/Scribit-Liberated/blob/main/docs/FLASHING.md). The only thing that changes between a stock unit and an already-converted one is **how you enter update (OTA) mode**: a stock unit gets *told* to over Wi-Fi (POST your creds to `:8888`); an already-local unit enters by **holding the LED button** through power-on. Both are written out step-by-step in the guide.
 
 ## First-comment (drop the "what changed recently" so the main post stays clean)
 

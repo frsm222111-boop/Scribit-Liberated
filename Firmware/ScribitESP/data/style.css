@@ -713,6 +713,20 @@ input[type="range"]::-moz-range-thumb {
 .donate-body { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin: 0 0 1.2rem; }
 .donate-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; }
 
+/* Post-draw support prompt (reuses the .setup-modal overlay) */
+.donate-modal-card { text-align: center; }
+.donate-modal-card .donate-kicker { letter-spacing: 0.18em; }
+.donate-modal-card h3 { font-size: 1.1rem; color: #fff; margin: 0 0 0.7rem; }
+.donate-modal-card .donate-body { min-height: 0; }
+.donate-modal-card .donate-actions { margin-top: 1.2rem; }
+.donate-modal-card .donate-actions .btn { width: auto; margin-top: 0; }
+.donate-never {
+  display: block; margin: 1rem auto 0; background: none; border: none;
+  color: var(--muted); font-size: 0.72rem; letter-spacing: 0.04em; cursor: pointer;
+  text-decoration: underline; opacity: 0.7;
+}
+.donate-never:hover { opacity: 1; }
+
 /* ===== Pen Rack ===== */
 .pen-rack-panel { margin-top: 1.4rem; }
 .pen-rack-title { font-size: 0.95rem; color: #fff; margin: 0 0 0.3rem; letter-spacing: 0.04em; }

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+- **Post-draw support prompt.** When a drawing finishes — the moment you're happiest with the robot —
+  the UI shows one gentle, dismissable card inviting you to support the project. It's **frequency-capped**
+  (first completed draw, then at most once a week) and disappears for good once you support or pick
+  "Don't show this again." The existing passive links (nav, footer, "Our Story") are unchanged. (`index.html`, `app.js`, `style.css`)
+- **Prominent download buttons + live download badge.** The README and flashing guide now lead with a
+  clear "⬇️ Download the firmware" call-to-action, and the README shows a live total-downloads badge.
+- **GitHub Sponsor button** via `.github/FUNDING.yml` (Ko-fi + UnBrickIt).
+
 ## [1.7.0] - 2026-06-16
 
 ### Added

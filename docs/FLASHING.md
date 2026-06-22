@@ -4,6 +4,9 @@ This guide flashes the firmware onto a Scribit over Wi‑Fi (OTA). It does **not
 
 > ⚠️ **Read this first.** Flashing carries a small risk of bricking the device, and there is **no warranty** (GPLv3). Flash at your own risk. The single most common cause of a failed flash is a **weak Wi‑Fi signal** or **letting go of the button** — both covered below.
 
+> ### ⬇️ [**Download the firmware + flasher (latest release)**](https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest)
+> You need **two files** from that page: `ScribitESP.ino.bin` (firmware) and `espota.py` (the flasher — use *this* one, not a random copy). Put both in one folder, then follow the steps below.
+
 ---
 
 ## Do I need to flash UnBrickIt first? (start here)

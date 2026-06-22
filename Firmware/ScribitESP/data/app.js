@@ -139,6 +139,44 @@ function showToast(msg, type) {
   toastTimer = setTimeout(function() { toast.classList.remove('show'); }, 3000);
 }
 
+// ---- Post-draw support prompt ---------------------------------------------
+// The static donation links (nav, footer, "Our Story") are passive — people only
+// see them if they go looking. The high-intent moment is right after a drawing
+// finishes, so we surface one gentle, frequency-capped ask there. State lives in
+// localStorage so it survives reloads: show on the first completed draw, then at
+// most once a week, and never again once the user supports or opts out.
+var DONATE_KEY = 'scribitDonate';
+function _donateState() {
+  try { return JSON.parse(localStorage.getItem(DONATE_KEY)) || {}; } catch (e) { return {}; }
+}
+function _saveDonateState(s) { try { localStorage.setItem(DONATE_KEY, JSON.stringify(s)); } catch (e) {} }
+
+function maybeShowDonatePrompt() {
+  var s = _donateState();
+  if (s.never || s.supported) return;             // opted out, or already gave
+  s.draws = (s.draws || 0) + 1;                   // count completed drawings
+  var now = Date.now();
+  var WEEK = 7 * 24 * 3600 * 1000;
+  var due = !s.lastShown || (now - s.lastShown) > WEEK;
+  _saveDonateState(s);
+  if (!due) return;
+  var modal = document.getElementById('draw-done-modal');
+  if (!modal) return;
+  s.lastShown = now; _saveDonateState(s);
+  modal.classList.remove('hidden');
+}
+
+(function wireDonatePrompt() {
+  var modal = document.getElementById('draw-done-modal');
+  if (!modal) return;
+  function close() { modal.classList.add('hidden'); }
+  function on(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  on('draw-done-later', close);
+  on('draw-done-support', function () { var s = _donateState(); s.supported = true; _saveDonateState(s); close(); });
+  on('draw-done-never', function () { var s = _donateState(); s.never = true; _saveDonateState(s); close(); });
+  modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+})();
+
 // API helpers
 async function apiGet(path) {
   var r = await fetch(API_BASE + path, { signal: AbortSignal.timeout(5000) });
@@ -343,7 +381,7 @@ async function pollStatus() {
     deviceState = s.state || 'IDLE';
     var drawing = (deviceState === 'PRINTING' || deviceState === 'ERASING');
     if (drawing && !wasDrawing) { drawStartT = Date.now(); wasDrawing = true; }
-    else if (!drawing && wasDrawing) { wasDrawing = false; showToast('Drawing complete!', 'success'); }
+    else if (!drawing && wasDrawing) { wasDrawing = false; showToast('Drawing complete!', 'success'); maybeShowDonatePrompt(); }
     renderStatus(deviceState, drawing ? Date.now() - drawStartT : 0);
     connInfo.textContent = 'Connected';
     connInfo.style.color = '#4ade80';

@@ -675,6 +675,24 @@
     </div>
   </div>
 
+  <!-- Post-draw support prompt: shown right after a drawing finishes (the high-intent
+       moment). Frequency-capped in app.js so it never nags. -->
+  <div id="draw-done-modal" class="setup-modal hidden">
+    <div class="setup-card donate-modal-card">
+      <div class="donate-kicker">Your wall just got art 🎉</div>
+      <h3 id="draw-done-title">Nice — your Scribit just finished a drawing.</h3>
+      <p class="donate-body">This robot was a brick when the company walked away. Keeping it alive —
+        new features, fixes, and helping other owners — runs entirely on what people chip in.
+        If Scribit Liberated brought your wall to life, please consider supporting it.
+        It's always free and open source; this is totally optional.</p>
+      <div class="donate-actions">
+        <a class="btn primary" href="https://ko-fi.com/kshrx" target="_blank" rel="noopener" id="draw-done-support">💛 Support this project</a>
+        <button class="btn secondary" id="draw-done-later" type="button">Maybe later</button>
+      </div>
+      <button class="btn-mini donate-never" id="draw-done-never" type="button">Don't show this again</button>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <!-- Live wall-preview: the drawing fills in on-screen as the robot plots it. -->
