@@ -28,14 +28,28 @@ function logDrawStart(lines) {
     at: Date.now(), lines: lines.length,
     head: lines.slice(0, 10), tail: lines.slice(-5),
     pct: 0, result: 'started', err: '', durMs: 0,
-    stateAtStart: deviceState, samdAtStart: lastSamd
+    stateAtStart: deviceState, samdAtStart: lastSamd, samdAtEnd: lastSamd,
+    hiccups: 0, bufferWaits: 0   // network retries / buffer-full backoffs during the feed
   };
   DRAW_LOG.push(e); DRAW_LOG = DRAW_LOG.slice(-2); saveDrawLog();
   return e;
 }
 function logDrawEnd(e, result) {
   if (!e) return;
-  e.result = result; e.pct = streamPct; e.durMs = Date.now() - e.at; saveDrawLog();
+  e.result = result; e.pct = streamPct; e.durMs = Date.now() - e.at; e.samdAtEnd = lastSamd; saveDrawLog();
+}
+
+// Device-state timeline — a small persisted ring of state changes with durations.
+// This is what answers "did it ever leave PRINTING, or is it stuck?" — including
+// across a disconnect/reconnect (the symptom we keep seeing).
+let STATE_LOG = [];
+try { STATE_LOG = JSON.parse(localStorage.getItem('scribit_statelog')) || []; } catch (e) { STATE_LOG = []; }
+function noteState(state) {
+  var now = Date.now();
+  var last = STATE_LOG[STATE_LOG.length - 1];
+  if (last && last.s === state) { last.until = now; }              // same state → extend
+  else { STATE_LOG.push({ s: state, at: now, until: now }); STATE_LOG = STATE_LOG.slice(-12); }
+  try { localStorage.setItem('scribit_statelog', JSON.stringify(STATE_LOG)); } catch (e) {}
 }
 
 // Pen rack — which marker/color is physically loaded in each carousel slot (1-4,
@@ -360,6 +374,7 @@ async function _runStream(lines) {
           // the SAME line is safe (exactly-once) — keep trying instead of killing
           // the whole drawing on one bad request (the old partial-draw failure).
           if (streamCancel) break;
+          if (logEntry) logEntry.hiccups++;
           if (++netFails > 240) throw new Error('lost connection to robot at line ' + i + ' of ' + lines.length);
           await sleep(Math.min(1000, 150 * netFails));   // backoff, cap 1s
           continue;
@@ -367,6 +382,7 @@ async function _runStream(lines) {
         var st = '';
         try { st = JSON.parse(resp).status; } catch (e) {}
         if (st !== 'full') break;         // 'queued' (incl. dedup) → accepted
+        if (logEntry) logEntry.bufferWaits++;
         await sleep(50);                  // buffer full → back off and retry
         if (++tries > 8000) throw new Error('robot stopped accepting g-code');
       }
@@ -405,6 +421,7 @@ async function pollStatus() {
     var s = await apiGet('/status');
     deviceState = s.state || 'IDLE';
     lastSamd = s.samd || 'unknown';
+    noteState(deviceState);
     renderSamdStatus(lastSamd);
     var drawing = (deviceState === 'PRINTING' || deviceState === 'ERASING');
     if (drawing && !wasDrawing) { drawStartT = Date.now(); wasDrawing = true; }
@@ -3282,6 +3299,21 @@ function buildDiagnosticReport(userText) {
   L.push('Current state: ' + deviceState);
   L.push('Motor board (SAMD) sync: ' + lastSamd +
     (lastSamd === 'not_detected' ? '  <-- motor board NOT detected; robot cannot move' : ''));
+  L.push('Browser/OS: ' + (navigator.userAgent || 'unknown'));
+  L.push('');
+  L.push('=== Recent device-state timeline ===');
+  if (!STATE_LOG.length) {
+    L.push('(none recorded — robot may never have connected)');
+  } else {
+    STATE_LOG.forEach(function (st) {
+      var held = Math.round((st.until - st.at) / 1000);
+      L.push('  ' + new Date(st.at).toLocaleTimeString() + '  ' + st.s + '   (held ' + held + 's)');
+    });
+    var lastSt = STATE_LOG[STATE_LOG.length - 1];
+    if (lastSt && (lastSt.s === 'PRINTING' || lastSt.s === 'ERASING')) {
+      L.push('  ^ NOTE: still in ' + lastSt.s + ' as of last check — never returned to IDLE (looks stuck).');
+    }
+  }
   L.push('');
   L.push('=== Calibration / settings ===');
   L.push('Units: ' + SETTINGS.units);
@@ -3298,7 +3330,9 @@ function buildDiagnosticReport(userText) {
     L.push('When: ' + new Date(e.at).toString());
     L.push('Lines sent: ' + e.lines + '   Reached: ' + e.pct + '%   Duration: ' + Math.round(e.durMs / 1000) + 's');
     L.push('Result: ' + e.result + (e.err ? ('   (error: ' + e.err + ')') : ''));
-    L.push('State at start: ' + e.stateAtStart + '   Motor board: ' + (e.samdAtStart || 'unknown'));
+    L.push('Network hiccups: ' + (e.hiccups || 0) + '   Buffer-full waits: ' + (e.bufferWaits || 0));
+    L.push('Motor board — start: ' + (e.samdAtStart || 'unknown') + '   end: ' + (e.samdAtEnd || 'unknown'));
+    L.push('Device state at start: ' + e.stateAtStart);
     L.push('First g-code lines:'); (e.head || []).forEach(function (g) { L.push('  ' + g); });
     L.push('Last g-code lines:'); (e.tail || []).forEach(function (g) { L.push('  ' + g); });
   });

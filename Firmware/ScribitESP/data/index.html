@@ -484,17 +484,7 @@
         motor controller — so the robot will say it's "drawing" while never moving or making
         a sound. <b>Fully power-cycle the robot</b> (unplug from power ~20s, then plug back in)
         and let it finish booting. If it still shows this after a power-cycle, send us a
-        diagnostic report below.
-      </div>
-
-      <div class="diag-panel">
-        <h3>Report a problem</h3>
-        <p class="settings-hint">Having trouble? Describe what's happening and download a
-          diagnostic report — it bundles your robot info, calibration, and your last 2 draw
-          attempts into a text file you can send us.</p>
-        <textarea id="diag-desc" class="diag-desc" rows="4"
-          placeholder="What's going wrong? e.g. progress climbs and the LED changes color, but the robot doesn't move or make any sound."></textarea>
-        <button id="diag-download" class="btn secondary">⬇ Download diagnostic report</button>
+        diagnostic report (Setup → Test) below.
       </div>
     </section>
 
@@ -531,6 +521,17 @@
 
       <div class="gen-actions">
         <button id="caltest-send" class="btn primary">Draw Test</button>
+      </div>
+
+      <div class="diag-panel">
+        <h3>Report a problem</h3>
+        <p class="settings-hint">Test didn't work, or the robot won't draw? Describe what's
+          happening and download a diagnostic report — it bundles your robot info, calibration,
+          and your last 2 draw attempts into a text file you can send us. Tip: download it from
+          the same device you drew from.</p>
+        <textarea id="diag-desc" class="diag-desc" rows="4"
+          placeholder="What's going wrong? e.g. progress climbs and the LED changes color, but the robot doesn't move or make any sound."></textarea>
+        <button id="diag-download" class="btn secondary">⬇ Download diagnostic report</button>
       </div>
     </section>
 
