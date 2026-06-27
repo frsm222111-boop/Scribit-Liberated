@@ -15,6 +15,28 @@ const API_BASE = 'http://' + (SETTINGS.ip || DEVICE_IP) + ':8888';
 let deviceState = 'BOOT';
 let currentFile = null;
 let uploadedGcode = null;
+let lastSamd = 'unknown';   // 'ok' | 'not_detected' | 'unknown' — motor-board sync, from /status
+
+// --- Diagnostics: a rolling log of the last 2 draw attempts, persisted so it
+// survives a disconnect/reconnect (the robot has no log of its own). Feeds the
+// "Report a problem" panel in Device Controls. ---
+let DRAW_LOG = [];
+try { DRAW_LOG = JSON.parse(localStorage.getItem('scribit_drawlog')) || []; } catch (e) { DRAW_LOG = []; }
+function saveDrawLog() { try { localStorage.setItem('scribit_drawlog', JSON.stringify(DRAW_LOG.slice(-2))); } catch (e) {} }
+function logDrawStart(lines) {
+  var e = {
+    at: Date.now(), lines: lines.length,
+    head: lines.slice(0, 10), tail: lines.slice(-5),
+    pct: 0, result: 'started', err: '', durMs: 0,
+    stateAtStart: deviceState, samdAtStart: lastSamd
+  };
+  DRAW_LOG.push(e); DRAW_LOG = DRAW_LOG.slice(-2); saveDrawLog();
+  return e;
+}
+function logDrawEnd(e, result) {
+  if (!e) return;
+  e.result = result; e.pct = streamPct; e.durMs = Date.now() - e.at; saveDrawLog();
+}
 
 // Pen rack — which marker/color is physically loaded in each carousel slot (1-4,
 // at Z 89/161/233/305). colorToPen() routes a drawing's colors to the nearest loaded pen.
@@ -315,6 +337,7 @@ async function _runStream(lines) {
   streamPct = 0;
   acquireWakeLock();
   var ok = false;
+  var logEntry = logDrawStart(lines);
   var sumX = 0, sumY = 0;   // net string-deltas actually sent → tracked machine position
   try {
     await apiPostResilient('/stream/start', '');
@@ -357,12 +380,14 @@ async function _runStream(lines) {
     ok = !streamCancel;
   } catch (e) {
     showToast('Stream error: ' + e.message, 'error');
+    if (logEntry) logEntry.err = e.message;
   } finally {
     try {
       if (ok) await apiPostResilient('/stream/end', '');   // finish cleanly
       else await apiPostResilient('/stop', '');            // cancelled/errored → halt
     } catch (e) {}
     advanceMachinePos(sumX, sumY);   // keep the tracked position in sync with what was sent
+    logDrawEnd(logEntry, logEntry && logEntry.err ? 'error' : (ok ? 'feed-complete' : 'stopped'));
     streamActive = false;
     releaseWakeLock();
     if (ok) showToast('All lines sent — robot finishing…', 'success');
@@ -379,6 +404,8 @@ async function pollStatus() {
   try {
     var s = await apiGet('/status');
     deviceState = s.state || 'IDLE';
+    lastSamd = s.samd || 'unknown';
+    renderSamdStatus(lastSamd);
     var drawing = (deviceState === 'PRINTING' || deviceState === 'ERASING');
     if (drawing && !wasDrawing) { drawStartT = Date.now(); wasDrawing = true; }
     else if (!drawing && wasDrawing) { wasDrawing = false; showToast('Drawing complete!', 'success'); maybeShowDonatePrompt(); }
@@ -409,6 +436,19 @@ function renderStatus(state, elapsedMs) {
   if (state === 'IDLE' || state === 'STANDBY') statusDot.classList.add('idle');
   else if (state === 'PRINTING' || state === 'ERASING' || state === 'HOMING') statusDot.classList.add('printing');
   else statusDot.classList.add('error');
+}
+
+// Surface the motor-board (SAMD) sync state. When it's 'not_detected' the robot
+// will happily accept a drawing and report "PRINTING" while never moving — so we
+// show a loud banner instead of letting the UI imply everything's fine.
+function renderSamdStatus(samd) {
+  var row = document.getElementById('info-samd');
+  if (row) {
+    row.textContent = samd === 'ok' ? 'OK' : (samd === 'not_detected' ? 'Not detected ⚠' : '—');
+    row.style.color = samd === 'not_detected' ? '#f87171' : '';
+  }
+  var warn = document.getElementById('samd-warning');
+  if (warn) warn.classList.toggle('hidden', samd !== 'not_detected');
 }
 
 function updateButtons(state) {
@@ -3220,4 +3260,64 @@ setInterval(pollStatus, 3000);
   });
 
   document.addEventListener('settings-changed', fill);
+})();
+
+// --- "Report a problem" — let the user describe the issue and download a plain-text
+// diagnostic report (robot + settings snapshot + the last 2 draw attempts). Gives
+// support something concrete to read when a drawing won't run. ---
+function buildDiagnosticReport(userText) {
+  function val(el) { return el && el.value != null ? el.value : ''; }
+  var L = [];
+  L.push('Scribit Liberated — Diagnostic Report');
+  L.push('Generated: ' + new Date().toString());
+  L.push('Page: ' + window.location.href);
+  L.push('');
+  L.push('=== Your description ===');
+  L.push(userText && userText.trim() ? userText.trim() : '(none provided)');
+  L.push('');
+  L.push('=== Robot ===');
+  L.push('Firmware: ' + (infoFirmware.textContent || 'unknown'));
+  L.push('Serial: ' + (infoSerial.textContent || 'unknown'));
+  L.push('Connection: ' + (connInfo.textContent || 'unknown'));
+  L.push('Current state: ' + deviceState);
+  L.push('Motor board (SAMD) sync: ' + lastSamd +
+    (lastSamd === 'not_detected' ? '  <-- motor board NOT detected; robot cannot move' : ''));
+  L.push('');
+  L.push('=== Calibration / settings ===');
+  L.push('Units: ' + SETTINGS.units);
+  L.push('Anchor spacing: ' + val(calibAnchor) + '   Strings L/R: ' + val(calibLeft) + ' / ' + val(calibRight));
+  L.push('X offset: ' + val(calibXoff) + '   Drop: ' + val(calibDrop));
+  L.push('Canvas W/H: ' + val(calibCanvasW) + ' / ' + val(calibCanvasH));
+  L.push('Pens: ' + PEN_RACK.map(function (p, i) { return (i + 1) + ':' + p.label; }).join(', '));
+  L.push('');
+  L.push('=== Last ' + DRAW_LOG.length + ' draw attempt(s) ===');
+  if (!DRAW_LOG.length) L.push('(no attempts recorded in this browser)');
+  DRAW_LOG.forEach(function (e, idx) {
+    L.push('');
+    L.push('-- Attempt ' + (idx + 1) + ' --');
+    L.push('When: ' + new Date(e.at).toString());
+    L.push('Lines sent: ' + e.lines + '   Reached: ' + e.pct + '%   Duration: ' + Math.round(e.durMs / 1000) + 's');
+    L.push('Result: ' + e.result + (e.err ? ('   (error: ' + e.err + ')') : ''));
+    L.push('State at start: ' + e.stateAtStart + '   Motor board: ' + (e.samdAtStart || 'unknown'));
+    L.push('First g-code lines:'); (e.head || []).forEach(function (g) { L.push('  ' + g); });
+    L.push('Last g-code lines:'); (e.tail || []).forEach(function (g) { L.push('  ' + g); });
+  });
+  return L.join('\n');
+}
+
+(function diagnostics() {
+  var btn = document.getElementById('diag-download');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var desc = document.getElementById('diag-desc');
+    var txt = buildDiagnosticReport(desc ? desc.value : '');
+    var blob = new Blob([txt], { type: 'text/plain' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url; a.download = 'scribit-diagnostic-' + stamp + '.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    showToast('Diagnostic report downloaded', 'success');
+  });
 })();

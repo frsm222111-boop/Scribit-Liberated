@@ -471,7 +471,30 @@
             <span class="info-label">Firmware</span>
             <span class="info-value" id="info-firmware">—</span>
           </div>
+          <div class="info-row">
+            <span class="info-label">Motor board</span>
+            <span class="info-value" id="info-samd">—</span>
+          </div>
         </div>
+      </div>
+
+      <div id="samd-warning" class="samd-warning hidden">
+        <b>⚠ Motor board not detected.</b>
+        The Wi-Fi board is running and the web interface works, but it can't talk to the
+        motor controller — so the robot will say it's "drawing" while never moving or making
+        a sound. <b>Fully power-cycle the robot</b> (unplug from power ~20s, then plug back in)
+        and let it finish booting. If it still shows this after a power-cycle, send us a
+        diagnostic report below.
+      </div>
+
+      <div class="diag-panel">
+        <h3>Report a problem</h3>
+        <p class="settings-hint">Having trouble? Describe what's happening and download a
+          diagnostic report — it bundles your robot info, calibration, and your last 2 draw
+          attempts into a text file you can send us.</p>
+        <textarea id="diag-desc" class="diag-desc" rows="4"
+          placeholder="What's going wrong? e.g. progress climbs and the LED changes color, but the robot doesn't move or make any sound."></textarea>
+        <button id="diag-download" class="btn secondary">⬇ Download diagnostic report</button>
       </div>
     </section>
 

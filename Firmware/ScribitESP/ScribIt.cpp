@@ -195,6 +195,7 @@ void ScribIt::begin()
                 delay(500);
             }
         }
+        m_samdSynced = syncd;   //Expose sync result so the UI can warn if the motor board never answered
         if (!syncd)
         {
             errorCode = SIMQTT_ERROR_CANNOT_SYNC_MK4DUO;

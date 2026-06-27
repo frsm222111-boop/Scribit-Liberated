@@ -4,7 +4,20 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-06-27
+
 ### Added
+- **"Motor board not detected" warning.** The Wi-Fi board and the motor controller (SAMD/MK4duo)
+  sync at boot; if that sync fails the robot used to serve the web UI and silently run in "local
+  mode" — accepting a drawing and reporting "PRINTING" while never moving or making a sound. The
+  firmware now reports the sync result (`samd` field in `/status`), and Device Controls shows the
+  motor-board state plus a loud banner telling you to power-cycle. No more phantom "Drawing".
+  (`ScribIt.hpp`, `ScribIt.cpp`, `ScribIt_wifi.cpp`, `app.js`, `index.html`, `style.css`)
+- **"Report a problem" diagnostic report.** Device Controls now has a panel where you describe the
+  issue and download a plain-text report bundling robot info, firmware version, motor-board sync
+  state, your calibration/settings, and the **last 2 draw attempts** (lines sent, % reached, result,
+  errors, and the first/last g-code lines). Gives support something concrete to read when a drawing
+  won't run. The attempt log persists across a disconnect/reconnect. (`app.js`, `index.html`, `style.css`)
 - **Post-draw support prompt.** When a drawing finishes — the moment you're happiest with the robot —
   the UI shows one gentle, dismissable card inviting you to support the project. It's **frequency-capped**
   (first completed draw, then at most once a week) and disappears for good once you support or pick

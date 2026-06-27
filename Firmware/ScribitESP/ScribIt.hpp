@@ -47,6 +47,12 @@ class ScribIt
   uint16_t m_samdVer;
   uint16_t m_spiffsVer;
 
+  //True once the ESP successfully synced with the SAMD motor controller at boot.
+  //If false, the robot serves the web UI but cannot drive the motors (it ran in
+  //"local mode"); surfaced in /status so the UI can warn instead of showing a
+  //phantom "Drawing".
+  bool m_samdSynced;
+
   //Error variables
   uint8_t errorCode;
   String errorMessage;
@@ -221,6 +227,7 @@ public:
     m_state = SI_RESET;
     m_samdVer = 0;
     m_spiffsVer = 0;
+    m_samdSynced = false;
     m_target = String("");
     m_isErase = false;
     m_printingTime = 0;
