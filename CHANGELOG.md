@@ -4,7 +4,18 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-## [1.7.1] - 2026-06-27
+## [1.7.2] - 2026-06-29
+
+### Fixed
+- **Robot reports "Drawing" but never moves (the real fix).** On this generation of Scribit the
+  motor board (SAMD) deadlocks — stuck on `busy:processing` forever while the robot keeps reporting
+  `PRINTING` and the on-screen percentage climbs — when g-code is streamed into it pipelined/fast.
+  This is what 1.7.1's diagnostic warning was catching but not curing. The web UI now **paces the
+  stream one command at a time**: after each line is accepted it waits for the motor board to
+  actually finish that move (polling `/samd`, flushing with `M114`) before sending the next, and
+  retries the slow carousel-home (`G77`) with `M410` if it hangs. Drawings now run start-to-finish
+  instead of locking up after the first move. The progress percentage also now tracks real draw
+  progress rather than how fast lines were shoved at the robot. (`app.js`)
 
 ### Added
 - **"Motor board not detected" warning.** The Wi-Fi board and the motor controller (SAMD/MK4duo)

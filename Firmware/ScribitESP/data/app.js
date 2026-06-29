@@ -344,6 +344,42 @@ async function streamDrawing(gcode, opts) {
   return { status: 'streaming', lines: lines.length };
 }
 
+// --- SAMD pacing -----------------------------------------------------------
+// This generation of Scribit's motor board (SAMD) deadlocks ("busy:processing"
+// forever, while the robot still reports PRINTING) when g-code is streamed into it
+// pipelined/fast. So we send ONE command at a time and wait for the board to
+// finish it before sending the next. The board prints "busy:processing" while
+// executing and "ok T:.." when idle; M114 (position query) flushes its serial so
+// stale 'busy' lines age out of /samd's tail.
+async function samdTail() {
+  var r = await fetch(API_BASE + '/samd', { signal: AbortSignal.timeout(5000) });
+  return (await r.text()).trim().split('\n');
+}
+async function samdIdle() {
+  try { await apiPost('/gcode', 'M114', true); } catch (e) {}
+  await sleep(150);
+  try { var t = await samdTail(); return !t.slice(-3).some(function (l) { return l.toLowerCase().indexOf('busy') >= 0; }); }
+  catch (e) { return false; }
+}
+// Wait for the command just sent to finish on the SAMD. Returns false on timeout.
+async function waitSamdDone(toMs) {
+  var t0 = Date.now(), saw = false, clear = 0;
+  while (true) {
+    if (streamCancel) return true;
+    await sleep(120);
+    if (await samdIdle()) clear++; else { saw = true; clear = 0; }
+    var el = Date.now() - t0;
+    if (saw && clear >= 2) return true;             // moved (saw busy) then settled
+    if (!saw && clear >= 2 && el > 600) return true; // fast/instant command
+    if (el > toMs) return false;                     // hung
+  }
+}
+function samdTimeout(line) {
+  if (line.indexOf('G77') === 0) return 90000;  // carousel homing is slow
+  if (/^G[0-3]\b/.test(line)) return 30000;     // motion
+  return 8000;                                  // instant M/G commands
+}
+
 async function _runStream(lines) {
   streamActive = true;
   streamCancel = false;
@@ -387,11 +423,26 @@ async function _runStream(lines) {
         if (++tries > 8000) throw new Error('robot stopped accepting g-code');
       }
       if (streamCancel) break;
+      // PACING: the line is now queued — wait for the SAMD to actually execute it
+      // before sending the next, so commands never pipeline (which deadlocks this
+      // motor board). G77 (carousel home) intermittently hangs — retry it with M410.
+      var done;
+      if (lines[i].indexOf('G77') === 0) {
+        done = false;
+        for (var k = 0; k < 4 && !done && !streamCancel; k++) {
+          done = await waitSamdDone(90000);
+          if (!done) { try { await apiPost('/gcode', 'M410', true); } catch (e) {} await sleep(2000); }
+        }
+      } else {
+        done = await waitSamdDone(samdTimeout(lines[i]));
+      }
+      if (!done && !streamCancel) throw new Error('robot stalled at line ' + (i + 1) + ': ' + lines[i]);
+      if (streamCancel) break;
       var mx = lines[i].match(/X(-?\d+(?:\.\d+)?)/), my = lines[i].match(/Y(-?\d+(?:\.\d+)?)/);
       if (mx) sumX += parseFloat(mx[1]);
       if (my) sumY += parseFloat(my[1]);
-      streamPct = Math.round(100 * i / lines.length);
-      if (i % 20 === 0) showToast('Drawing… ' + streamPct + '%', '');
+      streamPct = Math.round(100 * (i + 1) / lines.length);
+      if (i % 5 === 0) showToast('Drawing… ' + streamPct + '%', '');
     }
     ok = !streamCancel;
   } catch (e) {
