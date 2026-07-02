@@ -55,6 +55,8 @@ Pass `-I <your PC's real IP on the robot's 192.168.240.x network>`. If your comp
 **The web UI says "drawing" but the robot doesn't move.**
 Almost always the **carousel-homing step**: every drawing starts with a `G77` that homes the pen carousel and takes **60–90 seconds** with no XY travel. Give it ~90s before it starts the actual drawing. If it still won't move: make sure you've **calibrated** (Setup → Calibrate → Apply), and only drive it from **one device/tab at a time** (the robot's web server is single‑threaded).
 
+**Still nothing — no motor sound at all, even on a jog?** Your Scribit has **two** chips: the Wi‑Fi board (`ScribitESP.ino.bin`) and a **separate motor‑control chip (SAMD)** running `MK4duo.ino.bin`. Some units ship with **generic motor firmware** that acknowledges commands but can't drive the motors — so updating only the Wi‑Fi board never fixes it. Confirm with `curl -s -X POST http://192.168.240.1:8888/gcode --data-binary "M777"` then `curl -s http://192.168.240.1:8888/samd`; if it replies `Unknown command: "M777"`, flash **`MK4duo.ino.bin`** (attached to the [latest release](../../releases/latest)) to the motor board too — the UnBrickIt desktop app does this as its "2/2 SAMD21" step, or do it manually per the [Flashing guide](docs/FLASHING.md).
+
 **The robot moves but the pen never presses (nothing draws).**
 Fixed in **v1.7.0** — older builds let the motion chip auto‑disable the pen‑cam after 120s idle. Update to the [latest release](../../releases/latest). Also check each marker is seated firmly; you can nudge **Pen press depth** in Settings if a pen barely grazes the wall.
 
