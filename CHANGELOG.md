@@ -4,6 +4,31 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-07-01
+
+### Fixed
+- **"Center on wall" no longer looks broken when the robot is already centered.** If the robot
+  is already at (within ~3 mm of) the wall center, there is no distance to travel, so the old
+  code silently sent `G1 X0.000 Y-0.000` — no motors moved and it looked like a failure. It now
+  detects this, skips the no-op move, still records center as home, and tells you plainly:
+  *"Already at center — no travel needed… to test movement, use the jog arrows or draw a test
+  pattern."* (`app.js`)
+- **Robot no longer gets stuck showing "PRINTING" after a drawing finishes.** If the motor
+  board's final acknowledgement was missed at the end of a browser stream, the device could stay
+  in PRINTING forever (never returning to IDLE), blocking the next drawing. Added a return-to-IDLE
+  watchdog: once the browser has finished feeding, the buffer is drained, and the motor board has
+  stayed idle for ~3 s, the stream is force-ended and the device returns to IDLE. The watchdog only
+  fires when the draw is genuinely done, so it never cuts a live drawing short.
+  (`SISerialManager.cpp`, `SISerialManager.hpp`)
+
+### Added
+- **Richer "Report a problem" diagnostics for the "robot won't move" case.** Each draw attempt in
+  the diagnostic report now shows: **commanded pen-plane travel** (X/Y mm — instantly flags a
+  zero-distance move like an already-centered "Center on wall"), whether the **motor board ever went
+  "busy"/executed** during the feed (if travel was commanded but it never executed → points at the
+  motor board, not the firmware), and the **raw motor-board serial replies** captured at end of feed.
+  Turns "it didn't move" into an actionable software-vs-hardware verdict. (`app.js`)
+
 ## [1.7.2] - 2026-06-29
 
 ### Fixed

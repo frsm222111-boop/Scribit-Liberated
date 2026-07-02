@@ -49,6 +49,7 @@ private:
     bool m_smartCylinder;
     bool m_rawStream;      //True while a browser-driven RAM stream (/stream + /gcode) is active
     bool m_rawStreamDone;  //True once the browser has signalled it sent the last line
+    uint32_t m_streamDoneSince;  //millis() when a fed+drained raw stream first saw SAMD idle (0=not yet); watchdog
     long m_lastStreamSeq;  //Highest /gcode stream seq accepted; dedupes idempotent retries
     String m_samdLog[SI_SAMD_LOG_N];   //Recent interesting SAMD reply lines (debug)
     uint8_t m_samdLogHead;             //Next write index into m_samdLog

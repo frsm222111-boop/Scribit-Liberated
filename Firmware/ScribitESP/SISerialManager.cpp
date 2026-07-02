@@ -4,6 +4,10 @@
 
 #define SI_SM_MAX_REPLY_LEN 128
 #define SI_SM_ACK_TIMEOUT_MS 5000
+//Watchdog: after the browser has finished feeding a raw stream, force the stream to end
+//(device -> IDLE) once the buffer is drained and the SAMD has stayed idle this long. Rescues
+//"stuck in PRINTING" when the final SAMD ACK is missed.
+#define SI_SM_RAWSTREAM_END_MS 3000
 
 #define TAG "SerialManager"
 
@@ -17,6 +21,7 @@ SISerialManager::SISerialManager() :
     m_penSensitivity(true),
     m_rawStream(false),
     m_rawStreamDone(false),
+    m_streamDoneSince(0),
     m_lastStreamSeq(0),
     m_samdLogHead(0)
 {};
@@ -344,6 +349,29 @@ SIMKOperation SISerialManager::loop()
         }
     }
 
+    //Return-to-IDLE watchdog -------------------------------------------------------
+    //A browser raw-stream that has been fully fed (endRawStream -> m_rawStreamDone) must
+    //return the device to IDLE even if the SAMD's final ACK was missed. Once the buffer is
+    //drained AND the SAMD has stayed idle for the grace period, end the stream. This only
+    //fires when genuinely done (SAMD idle, nothing queued), so it never cuts a live draw.
+    if (m_rawStream && m_rawStreamDone && !m_streamEnded &&
+        extraLines.empty() && m_mkStatus == SIMK_IDLE)
+    {
+        if (m_streamDoneSince == 0)
+            m_streamDoneSince = millis();
+        else if (millis() - m_streamDoneSince > SI_SM_RAWSTREAM_END_MS)
+        {
+            m_rawStream = false;
+            m_streamEnded = true;
+            m_waitingForAck = false;
+            SIMQTT.debug(TAG, "Raw-stream watchdog: buffer drained + SAMD idle, ending stream");
+        }
+    }
+    else
+    {
+        m_streamDoneSince = 0;   //Conditions not met -> reset the grace timer
+    }
+
     //Return mk4duo status
     return m_mkStatus;
 }
@@ -463,6 +491,7 @@ void SISerialManager::beginRawStream()
     m_rawStreamDone = false;
     m_rawStream = true;
     m_lastStreamSeq = 0;   //Reset idempotent-retry sequence for the new stream
+    m_streamDoneSince = 0; //Reset return-to-IDLE watchdog for the new stream
     //Keep stream "open" so the main loop treats us as printing until we finish
     m_streamEnded = false;
 }

@@ -29,7 +29,10 @@ function logDrawStart(lines) {
     head: lines.slice(0, 10), tail: lines.slice(-5),
     pct: 0, result: 'started', err: '', durMs: 0,
     stateAtStart: deviceState, samdAtStart: lastSamd, samdAtEnd: lastSamd,
-    hiccups: 0, bufferWaits: 0   // network retries / buffer-full backoffs during the feed
+    hiccups: 0, bufferWaits: 0,   // network retries / buffer-full backoffs during the feed
+    travelX: null, travelY: null, // net pen-plane travel (mm) actually commanded this draw
+    samdBusySeen: false,          // did the motor board ever report "busy" (i.e. actually execute)?
+    samdTailEnd: ''               // raw motor-board serial replies captured at end of feed
   };
   DRAW_LOG.push(e); DRAW_LOG = DRAW_LOG.slice(-2); saveDrawLog();
   return e;
@@ -358,7 +361,12 @@ async function samdTail() {
 async function samdIdle() {
   try { await apiPost('/gcode', 'M114', true); } catch (e) {}
   await sleep(150);
-  try { var t = await samdTail(); return !t.slice(-3).some(function (l) { return l.toLowerCase().indexOf('busy') >= 0; }); }
+  try {
+    var t = await samdTail();
+    var busy = t.slice(-3).some(function (l) { return l.toLowerCase().indexOf('busy') >= 0; });
+    if (busy) window._samdBusySeen = true;   // record for the diagnostic report (did the motors ever execute?)
+    return !busy;
+  }
   catch (e) { return false; }
 }
 // Wait for the command just sent to finish on the SAMD. Returns false on timeout.
@@ -388,6 +396,7 @@ async function _runStream(lines) {
   acquireWakeLock();
   var ok = false;
   var logEntry = logDrawStart(lines);
+  window._samdBusySeen = false;   // reset per-draw motor-board activity flag (diagnostic)
   var sumX = 0, sumY = 0;   // net string-deltas actually sent → tracked machine position
   try {
     await apiPostResilient('/stream/start', '');
@@ -454,6 +463,13 @@ async function _runStream(lines) {
       else await apiPostResilient('/stop', '');            // cancelled/errored → halt
     } catch (e) {}
     advanceMachinePos(sumX, sumY);   // keep the tracked position in sync with what was sent
+    if (logEntry) {
+      // Capture the "did it actually move?" evidence for the diagnostic report.
+      logEntry.travelX = Math.round(sumX * 10) / 10;
+      logEntry.travelY = Math.round(sumY * 10) / 10;
+      logEntry.samdBusySeen = !!window._samdBusySeen;
+      try { logEntry.samdTailEnd = (await samdTail()).slice(-6).join('  |  '); } catch (e) {}
+    }
     logDrawEnd(logEntry, logEntry && logEntry.err ? 'error' : (ok ? 'feed-complete' : 'stopped'));
     streamActive = false;
     releaseWakeLock();
@@ -1720,10 +1736,16 @@ if (btnCenter) btnCenter.addEventListener('click', async function () {
   // comes out ~0, so the robot only homes the carousel and never travels.
   var cur = (MACHINE_POS && isFinite(MACHINE_POS.L) && isFinite(MACHINE_POS.R)) ? MACHINE_POS : { L: calibMM.left, R: calibMM.right };
   var dL = tL - cur.L, dR = tR - cur.R;
-  var g = 'M17\nG77\nG90\nG1 Z160\nG91\nG1 Z-70\nG1 F1500\nG1 X' + dL.toFixed(3) + ' Y' + (-dR).toFixed(3) + '\nM18\n';
+  // If the robot is already at (within ~3 mm of) center there is nothing to travel —
+  // sending "G1 X0 Y0" makes the robot look broken (no motors move, no sound). Detect
+  // that and tell the user plainly, still recording center as home.
+  var moveNeeded = Math.abs(dL) > 3 || Math.abs(dR) > 3;
   btnCenter.disabled = true;
   try {
-    await streamDrawing(g, { bounds: false });
+    if (moveNeeded) {
+      var g = 'M17\nG77\nG90\nG1 Z160\nG91\nG1 Z-70\nG1 F1500\nG1 X' + dL.toFixed(3) + ' Y' + (-dR).toFixed(3) + '\nM18\n';
+      await streamDrawing(g, { bounds: false });
+    }
     calibMM = { anchor: A, left: tL, right: tR, canvasW: calibMM.canvasW, canvasH: calibMM.canvasH };
     var f = calibFactor(), u = calibUnit, dp = (u === 'in') ? 2 : 1, dp0 = (u === 'in') ? 1 : 0;
     if (calibLeft) calibLeft.value = (tL / f).toFixed(dp);
@@ -1732,7 +1754,9 @@ if (btnCenter) btnCenter.addEventListener('click', async function () {
     if (calibDrop) calibDrop.value = (cy / f).toFixed(dp0);
     calibComputed.innerHTML = 'Position: <b>x ' + (cx / f).toFixed(dp0) + '</b> · <b>y ' + (cy / f).toFixed(dp0) + '</b> ' + u + '<br>Strings: L <b>' + (tL / f).toFixed(dp) + '</b> · R <b>' + (tR / f).toFixed(dp) + '</b> ' + u;
     drawCalibDiagram(A, cx, cy);
-    showToast('Robot centered on wall', 'success');
+    showToast(moveNeeded
+      ? 'Robot centered on wall'
+      : 'Already at center — no travel needed (home set to center). To test movement, use the jog arrows or draw a test pattern.', 'success');
   } catch (e) { showToast('Center failed: ' + e.message, 'error'); }
   finally { btnCenter.disabled = false; }
 });
@@ -3383,6 +3407,15 @@ function buildDiagnosticReport(userText) {
     L.push('Result: ' + e.result + (e.err ? ('   (error: ' + e.err + ')') : ''));
     L.push('Network hiccups: ' + (e.hiccups || 0) + '   Buffer-full waits: ' + (e.bufferWaits || 0));
     L.push('Motor board — start: ' + (e.samdAtStart || 'unknown') + '   end: ' + (e.samdAtEnd || 'unknown'));
+    // --- movement evidence (answers "did the robot actually move, and if not, why?") ---
+    var tx = (e.travelX == null ? '?' : e.travelX), ty = (e.travelY == null ? '?' : e.travelY);
+    var zeroTravel = (e.travelX === 0 && e.travelY === 0);
+    L.push('Commanded travel: X=' + tx + ' mm   Y=' + ty + ' mm' +
+      (zeroTravel ? '   <-- ZERO pen-plane travel commanded (no XY movement was expected)' : ''));
+    L.push('Motor board went "busy"/executing during feed: ' + (e.samdBusySeen ? 'YES' : 'no') +
+      ((!e.samdBusySeen && !zeroTravel && (e.travelX != null)) ?
+        '   <-- travel WAS commanded but motor board never executed (likely a motor-board/SAMD issue, not firmware)' : ''));
+    if (e.samdTailEnd) L.push('Motor board replies at end of feed (raw): ' + e.samdTailEnd);
     L.push('Device state at start: ' + e.stateAtStart);
     L.push('First g-code lines:'); (e.head || []).forEach(function (g) { L.push('  ' + g); });
     L.push('Last g-code lines:'); (e.tail || []).forEach(function (g) { L.push('  ' + g); });

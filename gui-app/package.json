@@ -1,6 +1,6 @@
 {
   "name": "unbrickit",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "Control app for ScribIt wall drawing robot",
   "main": "./out/main/index.js",
   "scripts": {
