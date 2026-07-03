@@ -397,7 +397,7 @@
  * Put THERMAL PROTECTION COOLER at true to enable this feature for the cooler.   *
  *                                                                                *
  **********************************************************************************/
-#define THERMAL_PROTECTION_HOTENDS false
+#define THERMAL_PROTECTION_HOTENDS true
 #define THERMAL_PROTECTION_BED false
 #define THERMAL_PROTECTION_CHAMBER false
 #define THERMAL_PROTECTION_COOLER false
