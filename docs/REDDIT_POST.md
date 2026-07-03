@@ -1,4 +1,4 @@
-# Reddit post — draft (v1.7.0)
+# Reddit post — draft (v1.7.4)
 
 Post to r/scribit (and consider crossposting to r/plotters, r/functionalprint, r/3Dprinting for reach).
 Reddit hates ads — keep it personal and useful, lead with the story, put links at the bottom.
@@ -34,6 +34,7 @@ What it does now:
 - **Pause & resume mid-drawing** — stop to swap a dried marker or make an adjustment, then pick up right where it left off
 - **A live on-screen preview** that fills in as the robot plots, with progress and an always-handy Stop
 - **Rock-solid over Wi-Fi** — drawings used to die partway through on a flaky hotspot; now a hiccup just pauses and resumes instead of killing the job
+- **Fixed the dreaded "says Drawing but never moves" freeze** — the motor board could lock up if g-code was streamed too fast; it's now paced one command at a time so drawings run start-to-finish, plus a built-in diagnostic report that tells you exactly where a draw got stuck
 - **Emergency stop** and a stop that actually halts mid-move
 
 It's **free and open source (GPLv3)** and always will be. It also ate hundreds of hours, so it's pay-what-you-want if it saves your robot — totally optional.
@@ -41,7 +42,7 @@ It's **free and open source (GPLv3)** and always will be. It also ate hundreds o
 Happy to answer questions, help anyone flash theirs, or take feature requests. If your Scribit is bricked, it's very likely recoverable.
 
 **Code & flashing guide:** https://github.com/frsm222111-boop/Scribit-Liberated
-**Ready-to-flash firmware (v1.7.0):** https://github.com/frsm222111-boop/Scribit-Liberated/releases/tag/v1.7.0
+**Ready-to-flash firmware (latest):** https://github.com/frsm222111-boop/Scribit-Liberated/releases/latest
 **If it saved your robot (optional):** https://ko-fi.com/kshrx
 
 ---
@@ -56,11 +57,13 @@ Happy to answer questions, help anyone flash theirs, or take feature requests. I
 
 ## First-comment (drop the "what changed recently" so the main post stays clean)
 
-Recent additions in v1.7.0 if you've used UnBrickIt before: the whole control panel was reorganized
+Recent additions if you've used UnBrickIt before: the whole control panel was reorganized
 (12 tabs → 4 clean areas) and got a facelift; a built-in Calibration Test (5 designs, single pen or
-all 4); Pause/Resume mid-draw; a live wall-preview that fills in as it plots; and a big reliability
-fix — drawings are streamed line-by-line and now retry on a Wi-Fi hiccup instead of aborting, plus a
-fix for pens that would stop pressing on long jobs (the motion chip was auto-disabling the pen-cam
-after 120s idle). Earlier additions: paint-mode per-shape coloring, gzip-compressed UI (loads fast
-over the robot's hotspot), no stale-cache after updates, emergency stop, persistent calibration
-("calibrate once"), and a first-run setup guide. Full changelog is in the repo.
+all 4); Pause/Resume mid-draw; a live wall-preview that fills in as it plots. The big reliability
+run in v1.7.1–v1.7.4: g-code is now **paced one command at a time** so the motor board can't lock up
+mid-draw (the classic "says Drawing but never moves" freeze), a **return-to-IDLE watchdog** so it
+never gets stuck showing "Printing," a **"Report a problem" diagnostic** that pinpoints where a draw
+stalled (and even flags when a robot's motor board has the wrong firmware), and drawings retry over a
+Wi-Fi hiccup instead of aborting. Earlier additions: paint-mode per-shape coloring, gzip-compressed
+UI (loads fast over the robot's hotspot), no stale-cache after updates, emergency stop, persistent
+calibration ("calibrate once"), and a first-run setup guide. Full changelog is in the repo.
