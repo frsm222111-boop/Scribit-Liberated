@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.7.4] - 2026-07-02
+
+### Fixed
+- **Return-to-IDLE watchdog now also recovers units whose motor board never reports "idle".**
+  1.7.3's watchdog waited for the SAMD to explicitly report idle before ending a finished stream —
+  but some units never emit that idle chatter, so they could still hang in PRINTING. The watchdog
+  now has a second, longer hard-fallback window (~12 s) that ends a fully-fed, drained stream even
+  with no idle signal. It is still held off entirely while the motor board is BUSY/heating, so a
+  genuinely-executing final move is never cut short. (`SISerialManager.cpp`)
+
 ## [1.7.3] - 2026-07-01
 
 ### Fixed

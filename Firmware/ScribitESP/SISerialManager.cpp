@@ -5,9 +5,12 @@
 #define SI_SM_MAX_REPLY_LEN 128
 #define SI_SM_ACK_TIMEOUT_MS 5000
 //Watchdog: after the browser has finished feeding a raw stream, force the stream to end
-//(device -> IDLE) once the buffer is drained and the SAMD has stayed idle this long. Rescues
-//"stuck in PRINTING" when the final SAMD ACK is missed.
-#define SI_SM_RAWSTREAM_END_MS 3000
+//(device -> IDLE) once the buffer is drained. Rescues "stuck in PRINTING" when the final SAMD
+//ACK is missed. Two grace windows: short once the SAMD explicitly reports idle ("wait"), and a
+//longer hard fallback for units whose SAMD never emits idle chatter (still never cuts a live
+//draw, because the timer is held off whenever the SAMD is BUSY/HEATING).
+#define SI_SM_RAWSTREAM_END_MS 3000        //SAMD confirmed idle -> end quickly
+#define SI_SM_RAWSTREAM_END_HARD_MS 12000  //SAMD never reports idle -> hard fallback
 
 #define TAG "SerialManager"
 
@@ -354,22 +357,27 @@ SIMKOperation SISerialManager::loop()
     //return the device to IDLE even if the SAMD's final ACK was missed. Once the buffer is
     //drained AND the SAMD has stayed idle for the grace period, end the stream. This only
     //fires when genuinely done (SAMD idle, nothing queued), so it never cuts a live draw.
-    if (m_rawStream && m_rawStreamDone && !m_streamEnded &&
-        extraLines.empty() && m_mkStatus == SIMK_IDLE)
+    bool feedDrained = m_rawStream && m_rawStreamDone && !m_streamEnded && extraLines.empty();
+    bool samdWorking = (m_mkStatus == SIMK_BUSY || m_mkStatus == SIMK_HEATING);
+    if (feedDrained && !samdWorking)
     {
+        //Short grace once the SAMD explicitly reports idle; longer hard fallback otherwise
+        //(some units never emit "wait"). While the SAMD is BUSY the timer is reset above, so a
+        //genuinely-executing final move is never cut short.
+        uint32_t grace = (m_mkStatus == SIMK_IDLE) ? SI_SM_RAWSTREAM_END_MS : SI_SM_RAWSTREAM_END_HARD_MS;
         if (m_streamDoneSince == 0)
             m_streamDoneSince = millis();
-        else if (millis() - m_streamDoneSince > SI_SM_RAWSTREAM_END_MS)
+        else if (millis() - m_streamDoneSince > grace)
         {
             m_rawStream = false;
             m_streamEnded = true;
             m_waitingForAck = false;
-            SIMQTT.debug(TAG, "Raw-stream watchdog: buffer drained + SAMD idle, ending stream");
+            SIMQTT.debug(TAG, "Raw-stream watchdog: buffer drained, ending stream");
         }
     }
     else
     {
-        m_streamDoneSince = 0;   //Conditions not met -> reset the grace timer
+        m_streamDoneSince = 0;   //Still feeding, or SAMD actively working -> reset the grace timer
     }
 
     //Return mk4duo status
