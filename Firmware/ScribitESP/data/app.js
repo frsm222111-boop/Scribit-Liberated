@@ -488,6 +488,7 @@ async function pollStatus() {
     var s = await apiGet('/status');
     deviceState = s.state || 'IDLE';
     lastSamd = s.samd || 'unknown';
+    if (s.reset) window._lastReset = s.reset;   // why the ESP last restarted (for the diagnostic)
     noteState(deviceState);
     renderSamdStatus(lastSamd);
     var drawing = (deviceState === 'PRINTING' || deviceState === 'ERASING');
@@ -3374,6 +3375,13 @@ function buildDiagnosticReport(userText) {
   L.push('Current state: ' + deviceState);
   L.push('Motor board (SAMD) sync: ' + lastSamd +
     (lastSamd === 'not_detected' ? '  <-- motor board NOT detected; robot cannot move' : ''));
+  var rr = window._lastReset || 'unknown';
+  var rrNote = rr === 'brownout' ? '  <-- POWER problem: supply voltage sagged when the motors switched on (check the power adapter, connections, and that the carousel/pen moves freely)'
+    : (rr.indexOf('watchdog') === 0 || rr === 'crash') ? '  <-- FIRMWARE fault, NOT power: the chip hung/crashed and reset (report this)'
+    : rr === 'poweron' ? '  (normal power-on)'
+    : rr === 'software' ? '  (deliberate restart)'
+    : '';
+  L.push('Last restart reason (ESP chip): ' + rr + rrNote);
   L.push('Browser/OS: ' + (navigator.userAgent || 'unknown'));
   L.push('');
   L.push('=== Recent device-state timeline ===');

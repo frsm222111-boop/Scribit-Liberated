@@ -1,11 +1,31 @@
 #include "WiFi.h"
 #include "Esp.h"
 #include "WiFiServer.h"
+#include <esp_system.h>
 
 #include "SIConfig.hpp"
 #include "ScribIt.hpp"
 #include "FirmwareVersion.h"
 #include "web_ui.h"
+
+// Why the chip last restarted. Lets the diagnostic report say WHY the ESP rebooted
+// (e.g. "brownout" = power dip vs "watchdog"/"crash" = firmware) instead of guessing.
+static const char *resetReasonStr()
+{
+    switch (esp_reset_reason())
+    {
+    case ESP_RST_POWERON:   return "poweron";     // normal power-up
+    case ESP_RST_BROWNOUT:  return "brownout";    // supply voltage sagged (power problem)
+    case ESP_RST_TASK_WDT:  return "watchdog_task";
+    case ESP_RST_INT_WDT:   return "watchdog_int";
+    case ESP_RST_WDT:       return "watchdog";
+    case ESP_RST_PANIC:     return "crash";       // firmware exception
+    case ESP_RST_SW:        return "software";    // deliberate restart
+    case ESP_RST_EXT:       return "external";
+    case ESP_RST_DEEPSLEEP: return "deepsleep";
+    default:                return "unknown";
+    }
+}
 
 void replyBadRequest(WiFiClient &client, const char *error, const uint8_t t_ID[6])
 {
@@ -307,9 +327,9 @@ void ScribIt::handleHTTPRequests()
         client.println("Content-Type: application/json");
         client.println("Access-Control-Allow-Origin: *");
         client.println();
-        client.printf("{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\"}\n",
+        client.printf("{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\",\"reset\":\"%s\"}\n",
                       stateStr, pauseStr, m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5], FIRMWARE_VERSION,
-                      m_samdSynced ? "ok" : "not_detected");
+                      m_samdSynced ? "ok" : "not_detected", resetReasonStr());
     }
     else if (path == "/upload" && method == "POST")
     {
@@ -455,11 +475,11 @@ void ScribIt::handleHTTPRequests()
         client.println("Access-Control-Allow-Origin: *");
         client.println();
         client.printf(
-            "{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\"}\\n",
+            "{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\",\"reset\":\"%s\"}\\n",
             stateStr, pauseStr,
             m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5],
             FIRMWARE_VERSION,
-            m_samdSynced ? "ok" : "not_detected");
+            m_samdSynced ? "ok" : "not_detected", resetReasonStr());
     }
     else if (path == "/gcode" && method == "POST")
     {

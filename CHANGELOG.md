@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.7.5] - 2026-07-08
+
+### Added
+- **The diagnostic report now says WHY the ESP last restarted.** `/status` (and `/api/status`) now
+  include the ESP32 reset reason (`esp_reset_reason()`), and the "Report a problem" report translates
+  it to plain language — e.g. **"brownout"** (the power supply voltage sagged when the motors switched
+  on) vs **"watchdog"/"crash"** (a firmware fault). This turns "it reboots and drops WiFi the moment a
+  draw starts" reports into a one-line diagnosis, with no USB/serial monitor needed.
+  (`Firmware/ScribitESP/ScribIt_wifi.cpp`, `Firmware/ScribitESP/data/app.js`)
+
 ## [1.7.4] - 2026-07-02
 
 ### Fixed
