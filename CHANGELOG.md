@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.7.6] - 2026-07-12
+
+### Added
+- **The diagnostic report now shows a reboot PATTERN, not just the last reset.** 1.7.5 reported the
+  single last reset reason — but that resets to "poweron" the moment the user power-cycles, losing the
+  evidence. The ESP now keeps a persistent tally in NVS of every *unexpected* reset
+  (brownout / crash / watchdog), surfaced in `/status` as a new `reboots` object and summarised in the
+  "Report a problem" report: e.g. **"Unexpected reboots since setup: 5 (brownout 5, crash 0, watchdog 0)
+  — repeated BROWNOUTS = a power problem."** Makes the "it disconnects/reboots when I send any drawing"
+  tickets self-diagnosing even across power cycles. One NVS write per faulting boot (no per-draw wear).
+  (`Firmware/ScribitESP/RebootLog.{hpp,cpp}`, `ScribIt_wifi.cpp`, `ScribitESP.ino`, `data/app.js`)
+
 ## [1.7.5] - 2026-07-08
 
 ### Added

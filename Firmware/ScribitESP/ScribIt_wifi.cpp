@@ -7,6 +7,7 @@
 #include "ScribIt.hpp"
 #include "FirmwareVersion.h"
 #include "web_ui.h"
+#include "RebootLog.hpp"
 
 // Why the chip last restarted. Lets the diagnostic report say WHY the ESP rebooted
 // (e.g. "brownout" = power dip vs "watchdog"/"crash" = firmware) instead of guessing.
@@ -326,10 +327,12 @@ void ScribIt::handleHTTPRequests()
         client.println("HTTP/1.1 200 OK");
         client.println("Content-Type: application/json");
         client.println("Access-Control-Allow-Origin: *");
+        char rb[180];
+        RebootLog::json(rb, sizeof(rb));
         client.println();
-        client.printf("{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\",\"reset\":\"%s\"}\n",
+        client.printf("{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\",\"reset\":\"%s\",%s}\n",
                       stateStr, pauseStr, m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5], FIRMWARE_VERSION,
-                      m_samdSynced ? "ok" : "not_detected", resetReasonStr());
+                      m_samdSynced ? "ok" : "not_detected", resetReasonStr(), rb);
     }
     else if (path == "/upload" && method == "POST")
     {
@@ -473,13 +476,15 @@ void ScribIt::handleHTTPRequests()
         client.println("HTTP/1.1 200 OK");
         client.println("Content-Type: application/json");
         client.println("Access-Control-Allow-Origin: *");
+        char rb[180];
+        RebootLog::json(rb, sizeof(rb));
         client.println();
         client.printf(
-            "{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\",\"reset\":\"%s\"}\\n",
+            "{\"state\":\"%s\",\"paused\":\"%s\",\"id\":\"%.2x%.2x%.2x%.2x%.2x%.2x\",\"version\":\"%s\",\"samd\":\"%s\",\"reset\":\"%s\",%s}\\n",
             stateStr, pauseStr,
             m_ID[0], m_ID[1], m_ID[2], m_ID[3], m_ID[4], m_ID[5],
             FIRMWARE_VERSION,
-            m_samdSynced ? "ok" : "not_detected", resetReasonStr());
+            m_samdSynced ? "ok" : "not_detected", resetReasonStr(), rb);
     }
     else if (path == "/gcode" && method == "POST")
     {

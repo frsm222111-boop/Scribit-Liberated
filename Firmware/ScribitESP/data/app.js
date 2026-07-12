@@ -489,6 +489,7 @@ async function pollStatus() {
     deviceState = s.state || 'IDLE';
     lastSamd = s.samd || 'unknown';
     if (s.reset) window._lastReset = s.reset;   // why the ESP last restarted (for the diagnostic)
+    if (s.reboots) window._reboots = s.reboots; // running count of unexpected resets (survives power cycles)
     noteState(deviceState);
     renderSamdStatus(lastSamd);
     var drawing = (deviceState === 'PRINTING' || deviceState === 'ERASING');
@@ -3382,6 +3383,18 @@ function buildDiagnosticReport(userText) {
     : rr === 'software' ? '  (deliberate restart)'
     : '';
   L.push('Last restart reason (ESP chip): ' + rr + rrNote);
+  // Persistent reboot tally — survives power cycles, so it shows a PATTERN even if the
+  // user power-cycled after the fault (which would otherwise reset the reason to poweron).
+  var rb = window._reboots;
+  if (rb && rb.total > 0) {
+    L.push('Unexpected reboots since setup: ' + rb.total +
+      '  (brownout ' + (rb.brownout || 0) + ', crash ' + (rb.crash || 0) + ', watchdog ' + (rb.watchdog || 0) + ')' +
+      ((rb.brownout || 0) >= 2 ? '   <-- repeated BROWNOUTS = a power problem, not the firmware' :
+       ((rb.crash || 0) + (rb.watchdog || 0)) >= 2 ? '   <-- repeated CRASHES/watchdogs = a firmware fault (report this)' : ''));
+    if (rb.recent) L.push('Recent reset reasons (newest first): ' + rb.recent);
+  } else if (rb) {
+    L.push('Unexpected reboots since setup: 0 (no brownouts or crashes recorded — good)');
+  }
   L.push('Browser/OS: ' + (navigator.userAgent || 'unknown'));
   L.push('');
   L.push('=== Recent device-state timeline ===');

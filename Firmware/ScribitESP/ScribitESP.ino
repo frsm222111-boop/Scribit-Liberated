@@ -1,5 +1,6 @@
 #include "ScribIt.hpp"
 #include "SITestBancoESP.hpp"
+#include "RebootLog.hpp"
 
 ScribIt scribit;
 
@@ -30,6 +31,7 @@ void checkTestAndRun()
 
 void setup()
 {
+  RebootLog::begin();   // tally this boot's reset reason (brownout/crash/watchdog) before anything else
   checkTestAndRun();
   scribit.begin();
 }
