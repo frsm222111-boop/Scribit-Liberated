@@ -3392,6 +3392,13 @@ function buildDiagnosticReport(userText) {
       ((rb.brownout || 0) >= 2 ? '   <-- repeated BROWNOUTS = a power problem, not the firmware' :
        ((rb.crash || 0) + (rb.watchdog || 0)) >= 2 ? '   <-- repeated CRASHES/watchdogs = a firmware fault (report this)' : ''));
     if (rb.recent) L.push('Recent reset reasons (newest first): ' + rb.recent);
+    // Crash breadcrumb (1.7.7+): where the firmware was when it last crashed/hung.
+    if (rb.crashPhase) {
+      L.push('Last crash caught WHILE: ' + rb.crashPhase +
+        (rb.crashSeq ? ' (g-code line #' + rb.crashSeq + ')' : '') +
+        (rb.crashLine ? '  ->  ' + rb.crashLine : '') +
+        '   <-- the firmware died here; send this to the developer');
+    }
   } else if (rb) {
     L.push('Unexpected reboots since setup: 0 (no brownouts or crashes recorded — good)');
   }

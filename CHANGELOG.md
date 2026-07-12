@@ -13,6 +13,17 @@ All notable changes to this project are documented here.
   `download.meteca.org`) and repointed the Docker build + `FIRMWARE.md` at it. (Also why the
   release CI has failed for months; its trigger is now disabled — see `.github/workflows`.)
 
+## [1.7.7] - 2026-07-12
+
+### Added
+- **The diagnostic report now pinpoints WHERE the firmware crashed.** 1.7.5/1.7.6 could say
+  the ESP reset from a `crash`/`watchdog` but not where. 1.7.7 leaves a breadcrumb in RTC
+  memory (which survives a panic/watchdog reset) recording what the firmware was doing —
+  the g-code line number + text being handled, or the stream phase. After a crash-reset the
+  "Report a problem" report shows **"Last crash caught WHILE: gcode (g-code line #2) -> M84 S0"**,
+  turning "it crashes somewhere on draw start" into a fixable, located bug. Cheap RAM write,
+  no flash wear. (`RebootLog.{hpp,cpp}`, `ScribIt_wifi.cpp`, `data/app.js`)
+
 ## [1.7.6] - 2026-07-12
 
 ### Added

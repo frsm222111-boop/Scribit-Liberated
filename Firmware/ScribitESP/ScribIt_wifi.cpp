@@ -522,6 +522,8 @@ void ScribIt::handleHTTPRequests()
             }
             else
             {
+                // Breadcrumb the line we're about to handle so a crash here is pinpointed.
+                RebootLog::mark("gcode", seq >= 0 ? (uint32_t)seq : 0, gcodeCmd.c_str());
                 // Report whether the line was accepted so the browser can apply
                 // backpressure (the extra-line buffer is small; "full" means retry).
                 bool accepted = sm.addLineToStream(gcodeCmd.c_str());
@@ -550,6 +552,7 @@ void ScribIt::handleHTTPRequests()
         }
         else
         {
+            RebootLog::mark("stream-start", 0, "");   // breadcrumb: a draw just began
             sm.beginRawStream();
             setState(SI_PRINTING);
 
@@ -563,6 +566,7 @@ void ScribIt::handleHTTPRequests()
     else if (path == "/stream/end" && method == "POST")
     {
         // Browser finished sending; device returns IDLE once the buffer drains.
+        RebootLog::mark("idle", 0, "");   // breadcrumb: draw finished cleanly
         sm.endRawStream();
 
         client.println("HTTP/1.1 200 OK");
