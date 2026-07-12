@@ -29,14 +29,19 @@ RUN mkdir -p ${ARDUINO_USER_DIR}/libraries ${ARDUINO15_DIR}/packages
 # Install Arduino CLI
 RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s ${ARDUINO_CLI_VERSION}
 
-# Install briki:mbc-wb board package with retry for network issues
+# Install briki:mbc-wb board package.
+# NOTE: briki.org's package index URL is DEFUNCT — it now 301-redirects to an HTML page, so
+# `core update-index` reads HTML and the install fails ("Platform briki:mbc-wb not found").
+# We vendor a known-good copy of the index (boards/package_briki_index.json); the core +
+# toolchain ZIPs it references are still live on download.meteca.org.
+COPY boards/package_briki_index.json /tmp/package_briki_index.json
 RUN arduino-cli config init && \
-    arduino-cli config add board_manager.additional_urls https://www.briki.org/download/resources/package_briki_index.json && \
+    arduino-cli config add board_manager.additional_urls file:///tmp/package_briki_index.json && \
     arduino-cli config add board_manager.additional_urls https://dl.espressif.com/dl/package_esp32_dev_index.json && \
-    # Retry update-index and install (handles transient briki.org timeouts)
+    # Retry update-index and install (handles transient meteca.org timeouts)
     for i in 1 2 3; do \
         (arduino-cli core update-index && arduino-cli core install briki:mbc-wb@2.0.0) && break || \
-        ([ $i -lt 3 ] && echo "Retry $i/3 (briki.org timeout)..." && sleep 10) || exit 1; \
+        ([ $i -lt 3 ] && echo "Retry $i/3 (meteca.org timeout)..." && sleep 10) || exit 1; \
     done
 
 # Copy hardware override files

@@ -76,9 +76,16 @@ docker-compose -f docker/docker-compose.yml run --rm scribit-firmware \
 
 2. Add board URLs in `File > Preferences`:
    ```
-   https://www.briki.org/download/resources/package_briki_index.json
+   https://raw.githubusercontent.com/frsm222111-boop/Scribit-Liberated/main/boards/package_briki_index.json
    https://dl.espressif.com/dl/package_esp32_dev_index.json
    ```
+
+   > ⚠️ **Why the raw-GitHub URL and not briki.org?** Briki's own index URL
+   > (`https://www.briki.org/download/resources/package_briki_index.json`) is **defunct** —
+   > it now redirects to an HTML page, so Board Manager can't parse it. This repo vendors a
+   > known-good copy of that index at [`boards/package_briki_index.json`](boards/package_briki_index.json);
+   > the board core + compiler ZIPs it points to are still hosted (and live) on
+   > `download.meteca.org`, so the install works normally from the vendored index.
 
 3. Install **Briki MBC-WB v2.0.0** board in Board Manager
 

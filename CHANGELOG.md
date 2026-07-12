@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **Firmware is buildable again.** Briki's board-manager index URL
+  (`briki.org/download/resources/package_briki_index.json`) is defunct — it now redirects to
+  HTML, so `arduino-cli core install briki:mbc-wb` fails ("Platform not found") for anyone
+  without the core already cached. Vendored a known-good copy of the index at
+  `boards/package_briki_index.json` (the core/toolchain ZIPs it points to are still live on
+  `download.meteca.org`) and repointed the Docker build + `FIRMWARE.md` at it. (Also why the
+  release CI has failed for months; its trigger is now disabled — see `.github/workflows`.)
+
 ## [1.7.6] - 2026-07-12
 
 ### Added
