@@ -1,10 +1,15 @@
 name: Build and Release
 
+# DISABLED on tag push (2026-07-12). This workflow builds firmware in Docker by
+# downloading the Briki board core from briki.org — but that server has gone dark and
+# now serves HTML instead of the package index, so `arduino-cli core install
+# briki:mbc-wb@2.0.0` fails ("Platform not found") and every run fails. It produced
+# nothing we ship (the firmware .bin is built locally and attached to releases by hand),
+# so its only effect was a failure email on each release. Left as workflow_dispatch so
+# it's trivially re-enabled if CI is ever fixed (vendor/host the briki core to drop the
+# briki.org dependency), without deleting the pipeline definition.
 on:
-  push:
-    tags:
-      - 'v*'  # Trigger on version tags like v1.0.0
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:  # manual trigger only — see note above
 
 jobs:
   build-firmware:
