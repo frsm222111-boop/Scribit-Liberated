@@ -1,6 +1,7 @@
 #include "SISerialManager.hpp"
 #include "SIMQTT.hpp"
 #include "SIConfig.hpp"
+#include "RebootLog.hpp"   // crash breadcrumb (mark) — pinpoints the serial sub-step on a crash
 
 #define SI_SM_MAX_REPLY_LEN 128
 #define SI_SM_ACK_TIMEOUT_MS 5000
@@ -102,6 +103,9 @@ bool SISerialManager::streamLocalFile(String fileName)
 
 void SISerialManager::writeLine()
 {
+    // Breadcrumb: about to forward this command to the motor board (SAMD). If the crash is
+    // in the write/forward path, the post-crash report shows "samd-write -> <command>".
+    RebootLog::mark("samd-write", 0, currLine);
     //Write line to serial
     Serial.println(currLine);
     //Signal waiting for ack
@@ -252,6 +256,9 @@ SIMKOperation SISerialManager::loop()
 #ifdef SI_ECHO_GCODE
             SIMQTT.debug(TAG, String("R: \"") + samdSerialBuffer + "\"", 9);
 #endif
+            // Breadcrumb: about to parse this motor-board reply. If the crash is in the
+            // reply-handling path, the post-crash report shows "samd-reply -> <reply>".
+            RebootLog::mark("samd-reply", 0, samdSerialBuffer);
             // Capture interesting SAMD replies for the /samd debug endpoint
             // (skip the idle "wait" and bare "ok" spam so the log stays useful).
             if (strstr(samdSerialBuffer, "wait") == nullptr && strcmp(samdSerialBuffer, "ok") != 0)

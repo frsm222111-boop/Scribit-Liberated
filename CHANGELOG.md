@@ -13,6 +13,17 @@ All notable changes to this project are documented here.
   `download.meteca.org`) and repointed the Docker build + `FIRMWARE.md` at it. (Also why the
   release CI has failed for months; its trigger is now disabled — see `.github/workflows`.)
 
+## [1.7.8] - 2026-07-14
+
+### Added
+- **Finer crash breadcrumbs in the motor-board serial path.** 1.7.7 localised a user's
+  crash to the `M114` position-poll (the command the stream fires to check the motor board
+  is idle). To pinpoint the exact sub-step, the crash breadcrumb is now also updated right
+  before **forwarding a command to the SAMD** (`samd-write`) and right before **parsing a
+  SAMD reply** (`samd-reply`). After a crash the report distinguishes a write-path fault
+  from a reply-handling fault — e.g. "Last crash caught WHILE: samd-reply -> X:0.00 Y:0.00…".
+  Pure diagnostic (mark() calls only, no change to the motion/serial logic). (`SISerialManager.cpp`)
+
 ## [1.7.7] - 2026-07-12
 
 ### Added
