@@ -13,6 +13,21 @@ All notable changes to this project are documented here.
   `download.meteca.org`) and repointed the Docker build + `FIRMWARE.md` at it. (Also why the
   release CI has failed for months; its trigger is now disabled — see `.github/workflows`.)
 
+## [1.7.9] - 2026-07-19
+
+### Fixed
+- **The draw-start reboot is fixed.** Root cause, confirmed by 1.7.7's crash breadcrumb
+  (`Last crash caught WHILE: gcode -> M114` + `reset reason: crash`): on some units the ESP
+  firmware crashes/reboots the instant it has to handle the reply to `M114`, the position
+  poll the browser fired between draw lines to check the motor board. `M114` is the only
+  draw-time command whose answer isn't a plain `ok`, so it was the sole reply hitting an
+  untested handler path — the chip panicked on the very first poll (right after `M84 S0`),
+  which is why every draw died at "line 2," 0%, then dropped WiFi and reconnected ~10s later.
+  The stream pacing now polls with `M105` (temperature) instead: it returns a clean `ok T:..`
+  the firmware already handles on every robot, detects "busy" identically, and avoids the
+  crash entirely. Client-side change only — the motor-board serial/motion path is untouched,
+  so working robots are unaffected.
+
 ## [1.7.8] - 2026-07-14
 
 ### Added

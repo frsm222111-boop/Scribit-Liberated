@@ -352,14 +352,21 @@ async function streamDrawing(gcode, opts) {
 // forever, while the robot still reports PRINTING) when g-code is streamed into it
 // pipelined/fast. So we send ONE command at a time and wait for the board to
 // finish it before sending the next. The board prints "busy:processing" while
-// executing and "ok T:.." when idle; M114 (position query) flushes its serial so
-// stale 'busy' lines age out of /samd's tail.
+// executing and "ok T:.." when idle; the poll below just pokes the board so a
+// fresh reply lands and stale 'busy' lines age out of /samd's tail.
+//
+// We poll with M105 (temperature) NOT M114 (position): on some units the ESP
+// firmware crashes/reboots the instant it has to handle M114's long position
+// reply (it's the only draw-time command whose answer isn't a plain "ok", so it
+// hits an untested reply path), which resets the chip at draw start and drops
+// WiFi. M105 returns a clean "ok T:.." that the firmware already handles on every
+// robot, detects busy identically, and avoids that crash entirely.
 async function samdTail() {
   var r = await fetch(API_BASE + '/samd', { signal: AbortSignal.timeout(5000) });
   return (await r.text()).trim().split('\n');
 }
 async function samdIdle() {
-  try { await apiPost('/gcode', 'M114', true); } catch (e) {}
+  try { await apiPost('/gcode', 'M105', true); } catch (e) {}
   await sleep(150);
   try {
     var t = await samdTail();
