@@ -123,6 +123,12 @@ Only **release the button after success.** The robot reboots (a double white fla
 
 ## If the pen won't press (only rotates) — reflash the motion chip (SAMD)
 
+> ⚠️ **This section is NOT how you install or update the firmware.** It reflashes a *different* chip
+> (the motor board) and uses a different file (`MK4duo.ino.bin`, ~100 KB) and the extra `-c` flag.
+> **If you just want the latest Scribit Liberated version, use [Step 5](#step-5--flash) with
+> `ScribitESP.ino.bin` (~1.1 MB) and *no* `-c`.** Only follow the steps below if the carousel
+> rotates but the pen never presses to the wall.
+
 Some units (we've seen this on a newer model) have a **second chip** — the **SAMD21 motion
 controller** — running *generic firmware with none of the Scribit pen commands*. The
 symptom: the carousel rotates but the pen **never plunges to the wall**, so nothing draws

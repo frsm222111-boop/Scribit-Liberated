@@ -242,7 +242,7 @@ def serve(remoteAddr, localAddr, remotePort, localPort, password, filename, comm
           sock.close()
           return 1
         
-    except e:
+    except Exception:
       logging.error('No Result!')
       connection.close()
       f.close()

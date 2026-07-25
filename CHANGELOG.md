@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Fixed
+- **`espota.py` no longer crashes with `NameError: name 'e' is not defined`** when a flash
+  doesn't complete. The failure handler used the Python 2 `except e:` form; it now catches
+  cleanly and prints "No Result!" as intended. (Cosmetic — it only fired on the failure path —
+  but the traceback looked alarming.) The fixed flasher is re-attached to the v1.7.9 release.
+- **`FLASHING.md`: added a guardrail** so the SAMD/motor-board reflash command
+  (`-c -f MK4duo.ino.bin`) isn't mistaken for the firmware-update command. A user hit this —
+  ran the companion/SAMD command instead of Step 5's `ScribitESP.ino.bin` flash and it (correctly)
+  never updated the firmware.
 - **Firmware is buildable again.** Briki's board-manager index URL
   (`briki.org/download/resources/package_briki_index.json`) is defunct — it now redirects to
   HTML, so `arduino-cli core install briki:mbc-wb` fails ("Platform not found") for anyone
